@@ -1,14 +1,12 @@
 ﻿using RimWorld;
 using Verse;
 using Verse.AI;
-using System;
-using UnityEngine;
 
 namespace Riot.Companionship
 {
     public class CompVisitorCompanionship : ThingComp
     {
-        private const int DesireCheckDelay = 600; // 10 seconds after entering map
+        private const int DesireCheckDelay = 600; // 10 seconds
         private bool hasEvaluatedDesire = false;
         private bool wantsService = false;
         private bool isWaiting = false;
@@ -23,13 +21,13 @@ namespace Riot.Companionship
 
             ticksOnMap += 250;
 
-            // STEP 1 — Perform desire roll once
+            // STEP 1: Do desire check once
             if (!hasEvaluatedDesire && ticksOnMap >= DesireCheckDelay)
             {
                 EvaluateDesire(pawn);
             }
 
-            // STEP 2 — If they want service and haven't moved yet, push GoToCompanionSpot
+            // STEP 2: If they want service but are not waiting, assign GoToSpot
             if (hasEvaluatedDesire && wantsService && !isWaiting)
             {
                 TryAssignGoToSpot(pawn);
@@ -40,8 +38,8 @@ namespace Riot.Companionship
         {
             hasEvaluatedDesire = true;
 
-            // TEMP: Always 100% for debugging; later reintroduce 25-40% chance
-            float chance = 1.0f;
+            // Debug: Always yes for testing
+            float chance = 1f;
 
             if (Rand.Value <= chance)
             {
@@ -51,37 +49,38 @@ namespace Riot.Companionship
             else
             {
                 wantsService = false;
-                Log.Message($"[Companionship] Visitor {pawn.NameShortColored} does not want companionship.");
+                Log.Message($"[Companionship] Visitor {pawn.NameShortColored} does NOT want companionship.");
             }
         }
 
         private void TryAssignGoToSpot(Pawn pawn)
         {
-            // Already waiting or already have job? Skip.
             if (isWaiting) return;
-            if (pawn.CurJob != null && pawn.CurJob.def == CompanionJobDefOf.GoToCompanionSpot) return;
 
-            Thing spot = CompanionSpotUtility.GetClosestSpot(pawn);
+            if (pawn.CurJob != null &&
+                pawn.CurJob.def == CompanionshipDefOf.GoToCompanionSpot)
+                return;
+
+            Thing spot = CompSpotUtility.GetClosestSpot(pawn);
             if (spot == null) return;
 
-            Job job = JobMaker.MakeJob(CompanionJobDefOf.GoToCompanionSpot, spot);
+            Job job = JobMaker.MakeJob(CompanionshipDefOf.GoToCompanionSpot, spot);
             pawn.jobs.TryTakeOrderedJob(job, JobTag.Misc);
 
             Log.Message($"[Companionship] Visitor {pawn.NameShortColored} is heading to Companion Spot {spot.Label}.");
         }
 
-        // Called by JobDriver_GoToCompanionSpot when arrival is complete
+        // Called by GoToSpot driver
         public void Notify_ArrivedAtSpot(Pawn pawn)
         {
             isWaiting = true;
 
-            // Queue the actual wait job automatically
-            Thing spot = CompanionSpotUtility.GetClosestSpot(pawn);
-            if (spot != null && pawn.Spawned)
+            Thing spot = CompSpotUtility.GetClosestSpot(pawn);
+            if (spot != null)
             {
-                Job waitJob = JobMaker.MakeJob(CompanionJobDefOf.WaitForCompanionDate, spot);
+                Job waitJob = JobMaker.MakeJob(CompanionshipDefOf.WaitForCompanionDate, spot);
                 pawn.jobs.TryTakeOrderedJob(waitJob, JobTag.Misc);
-                Log.Message($"[Companionship] Visitor {pawn.NameShortColored} has arrived and is now WAITING for a companion.");
+                Log.Message($"[Companionship] Visitor {pawn.NameShortColored} has ARRIVED and is now WAITING.");
             }
         }
 

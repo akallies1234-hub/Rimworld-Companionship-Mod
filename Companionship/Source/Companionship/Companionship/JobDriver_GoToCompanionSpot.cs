@@ -15,10 +15,8 @@ namespace Riot.Companionship
         {
             this.FailOnDestroyedNullOrForbidden(TargetIndex.A);
 
-            // Move Toil
             yield return Toils_Goto.GotoCell(TargetIndex.A, PathEndMode.InteractionCell);
 
-            // Arrival Toil
             Toil arrival = new Toil();
             arrival.initAction = () =>
             {

@@ -54,6 +54,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Building_CompanionSpot.cs" />
+    <Compile Include="CompanionDateScriptHolder.cs" />
     <Compile Include="CompanionshipDefOf.cs" />
     <Compile Include="CompanionshipMod.cs" />
     <Compile Include="CompanionshipUtility.cs" />
