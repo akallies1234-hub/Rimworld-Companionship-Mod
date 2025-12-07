@@ -1,207 +1,90 @@
 ﻿using RimWorld;
 using Verse;
 using Verse.AI;
+using System;
+using UnityEngine;
 
 namespace Riot.Companionship
 {
-    public class CompProperties_VisitorCompanionship : CompProperties
-    {
-        public CompProperties_VisitorCompanionship()
-        {
-            this.compClass = typeof(CompVisitorCompanionship);
-        }
-    }
-
-    /// <summary>
-    /// Tracks a visitor's desire for companionship over the course of their stay.
-    /// Also handles moving the visitor to a Companion Spot to wait for a Companion
-    /// when appropriate.
-    /// </summary>
     public class CompVisitorCompanionship : ThingComp
     {
-        // DEBUG: cranked to 100% so we can clearly see the behavior.
-        // Once things are working and feel right, we can tune this back down.
-        private const float BaseInitialDesireChance = 1.0f; // 100% of valid visitors want companionship (for testing)
-        private const float BaseAdditionalServiceChance = 0.25f; // ~25% chance they want a second date
-
-        private bool hasEvaluatedInitialDesire;
-        private bool desiresCompanionship;
-        private bool isWaitingForCompanion;
-        private bool hasReceivedService;
-        private bool hasRolledForAdditionalService;
-        private bool wantsAdditionalService;
-
-        private Pawn Pawn => parent as Pawn;
-
-        public bool HasEvaluatedInitialDesire => hasEvaluatedInitialDesire;
-        public bool DesiresCompanionship => desiresCompanionship;
-
-        public bool IsWaitingForCompanion
-        {
-            get => isWaitingForCompanion;
-            set => isWaitingForCompanion = value;
-        }
-
-        public bool HasReceivedService => hasReceivedService;
-        public bool WantsAdditionalService => wantsAdditionalService;
+        private const int DesireCheckDelay = 600; // 10 seconds after entering map
+        private bool hasEvaluatedDesire = false;
+        private bool wantsService = false;
+        private bool isWaiting = false;
+        private int ticksOnMap = 0;
 
         public override void CompTickRare()
         {
             base.CompTickRare();
-            EvaluateInitialDesireIfNeeded();
-            TryHandleWaitingBehavior();
+            if (!(parent is Pawn pawn)) return;
+            if (!pawn.Spawned) return;
+            if (pawn.Faction == null || pawn.Faction.IsPlayer) return;
+
+            ticksOnMap += 250;
+
+            // STEP 1 — Perform desire roll once
+            if (!hasEvaluatedDesire && ticksOnMap >= DesireCheckDelay)
+            {
+                EvaluateDesire(pawn);
+            }
+
+            // STEP 2 — If they want service and haven't moved yet, push GoToCompanionSpot
+            if (hasEvaluatedDesire && wantsService && !isWaiting)
+            {
+                TryAssignGoToSpot(pawn);
+            }
         }
 
-        /// <summary>
-        /// Decide once per visit whether this visitor wants companionship at all.
-        /// DEBUG: for now, this is basically always true for valid visitors.
-        /// </summary>
-        private void EvaluateInitialDesireIfNeeded()
+        private void EvaluateDesire(Pawn pawn)
         {
-            if (hasEvaluatedInitialDesire)
+            hasEvaluatedDesire = true;
+
+            // TEMP: Always 100% for debugging; later reintroduce 25-40% chance
+            float chance = 1.0f;
+
+            if (Rand.Value <= chance)
             {
-                return;
+                wantsService = true;
+                Log.Message($"[Companionship] Visitor {pawn.NameShortColored} from {pawn.Faction.Name} desire roll: WANTS companionship (chance={chance * 100:F0} %).");
             }
-
-            Pawn pawn = Pawn;
-            if (pawn == null || !pawn.Spawned)
+            else
             {
-                return;
+                wantsService = false;
+                Log.Message($"[Companionship] Visitor {pawn.NameShortColored} does not want companionship.");
             }
-
-            // Only visitors / non-player pawns; we don't want colonists using this logic.
-            if (pawn.Faction == null || pawn.Faction == Faction.OfPlayerSilentFail)
-            {
-                return;
-            }
-
-            if (!pawn.RaceProps?.Humanlike ?? true)
-            {
-                return;
-            }
-
-            hasEvaluatedInitialDesire = true;
-
-            float chance = BaseInitialDesireChance;
-            desiresCompanionship = Rand.Value < chance;
-
-            // DEBUG LOG
-            Log.Message($"[Companionship] Visitor {pawn.LabelShort} from {pawn.Faction?.Name ?? "no faction"} desire roll: {(desiresCompanionship ? "WANTS" : "does NOT want")} companionship (chance={chance:P0}).");
         }
 
-        /// <summary>
-        /// Handle sending the visitor to a Companion Spot to wait, if they want companionship,
-        /// a spot exists, and at least one available Companion is present.
-        /// </summary>
-        private void TryHandleWaitingBehavior()
+        private void TryAssignGoToSpot(Pawn pawn)
         {
-            Pawn pawn = Pawn;
-            if (pawn == null || !pawn.Spawned || pawn.Dead)
-            {
-                return;
-            }
+            // Already waiting or already have job? Skip.
+            if (isWaiting) return;
+            if (pawn.CurJob != null && pawn.CurJob.def == CompanionJobDefOf.GoToCompanionSpot) return;
 
-            if (!desiresCompanionship)
-            {
-                return;
-            }
+            Thing spot = CompanionSpotUtility.GetClosestSpot(pawn);
+            if (spot == null) return;
 
-            // Already flagged as waiting, nothing to do.
-            if (isWaitingForCompanion)
-            {
-                return;
-            }
+            Job job = JobMaker.MakeJob(CompanionJobDefOf.GoToCompanionSpot, spot);
+            pawn.jobs.TryTakeOrderedJob(job, JobTag.Misc);
 
-            // If they've already received service and do NOT want more, never queue again.
-            if (hasReceivedService && !wantsAdditionalService)
-            {
-                return;
-            }
-
-            // Don't override critical states.
-            if (pawn.Drafted || pawn.InAggroMentalState)
-            {
-                return;
-            }
-
-            // If they're already on the waiting job, don't re-issue it.
-            if (pawn.CurJobDef == CompanionshipDefOf.WaitForCompanionDate)
-            {
-                return;
-            }
-
-            Map map = pawn.Map;
-            if (map == null)
-            {
-                return;
-            }
-
-            // Find a Companion Spot.
-            Building_CompanionSpot spot = CompanionshipUtility.FindNearestCompanionSpot(pawn);
-            if (spot == null)
-            {
-                // DEBUG LOG
-                Log.Message($"[Companionship] Visitor {pawn.LabelShort} WANTS companionship but there is NO Companion Spot on the map.");
-                return;
-            }
-
-            // Only bother if there is at least one available Companion for this visitor.
-            if (!CompanionshipUtility.HasAvailableCompanionFor(pawn))
-            {
-                // DEBUG LOG
-                Log.Message($"[Companionship] Visitor {pawn.LabelShort} WANTS companionship but NO available Companion was found (work disabled, limits, or unreachable).");
-                return;
-            }
-
-            Job waitJob = JobMaker.MakeJob(CompanionshipDefOf.WaitForCompanionDate, spot);
-            waitJob.locomotionUrgency = LocomotionUrgency.Walk; // natural approach, no sprint
-            pawn.jobs.TryTakeOrderedJob(waitJob);
-
-            // DEBUG LOG
-            Log.Message($"[Companionship] Visitor {pawn.LabelShort} is heading to Companion Spot {spot.LabelShort} to WAIT for a companion.");
+            Log.Message($"[Companionship] Visitor {pawn.NameShortColored} is heading to Companion Spot {spot.Label}.");
         }
 
-        /// <summary>
-        /// Called when this visitor has completed a companion date.
-        /// Marks that they have received service and, once, decides if they want more.
-        /// </summary>
-        public void Notify_ServiceReceived()
+        // Called by JobDriver_GoToCompanionSpot when arrival is complete
+        public void Notify_ArrivedAtSpot(Pawn pawn)
         {
-            hasReceivedService = true;
+            isWaiting = true;
 
-            if (hasRolledForAdditionalService)
+            // Queue the actual wait job automatically
+            Thing spot = CompanionSpotUtility.GetClosestSpot(pawn);
+            if (spot != null && pawn.Spawned)
             {
-                return;
+                Job waitJob = JobMaker.MakeJob(CompanionJobDefOf.WaitForCompanionDate, spot);
+                pawn.jobs.TryTakeOrderedJob(waitJob, JobTag.Misc);
+                Log.Message($"[Companionship] Visitor {pawn.NameShortColored} has arrived and is now WAITING for a companion.");
             }
-
-            hasRolledForAdditionalService = true;
-
-            float chance = BaseAdditionalServiceChance;
-            wantsAdditionalService = Rand.Value < chance;
-
-            // DEBUG LOG
-            Pawn pawn = Pawn;
-            Log.Message($"[Companionship] Visitor {pawn?.LabelShort ?? "unknown"} completed a date and {(wantsAdditionalService ? "WANTS" : "does NOT want")} additional service (chance={chance:P0}).");
         }
 
-        /// <summary>
-        /// Clear "waiting" state when the visitor leaves the spot or finishes a date.
-        /// </summary>
-        public void ResetWaitingState()
-        {
-            isWaitingForCompanion = false;
-        }
-
-        public override void PostExposeData()
-        {
-            base.PostExposeData();
-
-            Scribe_Values.Look(ref hasEvaluatedInitialDesire, "compVisitor_hasEvaluatedInitialDesire", false);
-            Scribe_Values.Look(ref desiresCompanionship, "compVisitor_desiresCompanionship", false);
-            Scribe_Values.Look(ref isWaitingForCompanion, "compVisitor_isWaitingForCompanion", false);
-            Scribe_Values.Look(ref hasReceivedService, "compVisitor_hasReceivedService", false);
-            Scribe_Values.Look(ref hasRolledForAdditionalService, "compVisitor_hasRolledForAdditionalService", false);
-            Scribe_Values.Look(ref wantsAdditionalService, "compVisitor_wantsAdditionalService", false);
-        }
+        public bool IsWaiting => isWaiting;
     }
 }
