@@ -19,86 +19,42 @@ namespace Riot.Companionship
     /// </summary>
     public class CompVisitorCompanionship : ThingComp
     {
-        private const float BaseInitialDesireChance = 0.35f; // ~35% of visitors want companionship
+        // DEBUG: cranked to 100% so we can clearly see the behavior.
+        // Once things are working and feel right, we can tune this back down.
+        private const float BaseInitialDesireChance = 1.0f; // 100% of valid visitors want companionship (for testing)
         private const float BaseAdditionalServiceChance = 0.25f; // ~25% chance they want a second date
-
-        // How long (in ticks) the pawn must be on the map before they will
-        // actually peel off and head to the Companion Spot.
-        // This lets the visitor group finish their "arrival" behavior first.
-        private const int MinTicksOnMapBeforeHeadingToSpot = 6000;
 
         private bool hasEvaluatedInitialDesire;
         private bool desiresCompanionship;
-
         private bool isWaitingForCompanion;
-
         private bool hasReceivedService;
         private bool hasRolledForAdditionalService;
         private bool wantsAdditionalService;
 
-        // Tracks how long this pawn has been present on the current map.
-        private int ticksOnMap;
-
         private Pawn Pawn => parent as Pawn;
 
-        /// <summary>
-        /// Has this visitor decided whether they want a companion at all this visit?
-        /// </summary>
         public bool HasEvaluatedInitialDesire => hasEvaluatedInitialDesire;
-
-        /// <summary>
-        /// Whether this visitor wants at least one companion date this visit.
-        /// </summary>
         public bool DesiresCompanionship => desiresCompanionship;
 
-        /// <summary>
-        /// Whether this visitor is currently considered "in queue" / waiting for a companion.
-        /// This is set while they are on the WaitForCompanionDate job.
-        /// </summary>
         public bool IsWaitingForCompanion
         {
             get => isWaitingForCompanion;
             set => isWaitingForCompanion = value;
         }
 
-        /// <summary>
-        /// Whether this visitor has already received at least one service.
-        /// </summary>
         public bool HasReceivedService => hasReceivedService;
-
-        /// <summary>
-        /// Whether they want additional services after the first one.
-        /// This is decided once, after their first completed date.
-        /// </summary>
         public bool WantsAdditionalService => wantsAdditionalService;
-
-        // === Ticking ===
-
-        public override void CompTick()
-        {
-            base.CompTick();
-
-            Pawn pawn = Pawn;
-            if (pawn == null || !pawn.Spawned || pawn.Dead)
-            {
-                return;
-            }
-
-            // Simple "time on map" counter; used to delay heading to the CompanionSpot.
-            ticksOnMap++;
-        }
 
         public override void CompTickRare()
         {
             base.CompTickRare();
-
             EvaluateInitialDesireIfNeeded();
             TryHandleWaitingBehavior();
         }
 
         /// <summary>
         /// Decide once per visit whether this visitor wants companionship at all.
-        /// For now this is pure RNG, but future versions will add modifiers.
+        /// DEBUG: for now, this is basically always true for valid visitors.
         /// </summary>
         private void EvaluateInitialDesireIfNeeded()
         {
@@ -125,10 +81,12 @@ namespace Riot.Companionship
             }
 
             hasEvaluatedInitialDesire = true;
-            float chance = BaseInitialDesireChance;
 
-            // TODO: Future: adjust by traits, needs, faction, storyteller, etc.
+            float chance = BaseInitialDesireChance;
             desiresCompanionship = Rand.Value < chance;
+
+            // DEBUG LOG
+            Log.Message($"[Companionship] Visitor {pawn.LabelShort} from {pawn.Faction?.Name ?? "no faction"} desire roll: {(desiresCompanionship ? "WANTS" : "does NOT want")} companionship (chance={chance:P0}).");
         }
 
         /// <summary>
@@ -166,12 +124,6 @@ namespace Riot.Companionship
                 return;
             }
 
-            // Let the visitor group "arrive" before peeling off to the Companion Spot.
-            if (ticksOnMap < MinTicksOnMapBeforeHeadingToSpot)
-            {
-                return;
-            }
-
             // If they're already on the waiting job, don't re-issue it.
             if (pawn.CurJobDef == CompanionshipDefOf.WaitForCompanionDate)
             {
@@ -188,22 +140,25 @@ namespace Riot.Companionship
             Building_CompanionSpot spot = CompanionshipUtility.FindNearestCompanionSpot(pawn);
             if (spot == null)
             {
+                // DEBUG LOG
+                Log.Message($"[Companionship] Visitor {pawn.LabelShort} WANTS companionship but there is NO Companion Spot on the map.");
                 return;
             }
 
             // Only bother if there is at least one available Companion for this visitor.
             if (!CompanionshipUtility.HasAvailableCompanionFor(pawn))
             {
+                // DEBUG LOG
+                Log.Message($"[Companionship] Visitor {pawn.LabelShort} WANTS companionship but NO available Companion was found (work disabled, limits, or unreachable).");
                 return;
             }
 
             Job waitJob = JobMaker.MakeJob(CompanionshipDefOf.WaitForCompanionDate, spot);
-
-            // Explicitly WALK to the spot so it looks natural, not like a sprint.
-            waitJob.locomotionUrgency = LocomotionUrgency.Walk;
-            waitJob.ignoreJoyTimeAssignment = true;
-
+            waitJob.locomotionUrgency = LocomotionUrgency.Walk; // natural approach, no sprint
             pawn.jobs.TryTakeOrderedJob(waitJob);
+
+            // DEBUG LOG
+            Log.Message($"[Companionship] Visitor {pawn.LabelShort} is heading to Companion Spot {spot.LabelShort} to WAIT for a companion.");
         }
 
         /// <summary>
@@ -220,10 +175,13 @@ namespace Riot.Companionship
             }
 
             hasRolledForAdditionalService = true;
-            float chance = BaseAdditionalServiceChance;
 
-            // TODO: Future: adjust based on how good the date was, needs, traits, etc.
+            float chance = BaseAdditionalServiceChance;
             wantsAdditionalService = Rand.Value < chance;
+
+            // DEBUG LOG
+            Pawn pawn = Pawn;
+            Log.Message($"[Companionship] Visitor {pawn?.LabelShort ?? "unknown"} completed a date and {(wantsAdditionalService ? "WANTS" : "does NOT want")} additional service (chance={chance:P0}).");
         }
 
         /// <summary>
@@ -240,15 +198,10 @@ namespace Riot.Companionship
 
             Scribe_Values.Look(ref hasEvaluatedInitialDesire, "compVisitor_hasEvaluatedInitialDesire", false);
             Scribe_Values.Look(ref desiresCompanionship, "compVisitor_desiresCompanionship", false);
-
             Scribe_Values.Look(ref isWaitingForCompanion, "compVisitor_isWaitingForCompanion", false);
-
             Scribe_Values.Look(ref hasReceivedService, "compVisitor_hasReceivedService", false);
             Scribe_Values.Look(ref hasRolledForAdditionalService, "compVisitor_hasRolledForAdditionalService", false);
             Scribe_Values.Look(ref wantsAdditionalService, "compVisitor_wantsAdditionalService", false);
-
-            // Save our time-on-map counter so behavior is consistent across reloads.
-            Scribe_Values.Look(ref ticksOnMap, "compVisitor_ticksOnMap", 0);
         }
     }
 }
