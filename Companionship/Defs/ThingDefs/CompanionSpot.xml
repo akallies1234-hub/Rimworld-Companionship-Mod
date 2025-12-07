@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+
+  <ThingDef ParentName="BuildingBase">
+    <defName>CompanionSpot</defName>
+    <label>companion spot</label>
+    <description>A designated waiting area where visitors gather if they desire companionship.</description>
+
+    <thingClass>Riot.Companionship.Building_CompanionSpot</thingClass>
+
+    <category>Building</category>
+    <selectable>true</selectable>
+    <altitudeLayer>Item</altitudeLayer>
+    <passability>Standable</passability>
+    <useHitPoints>false</useHitPoints>
+    <tickerType>Never</tickerType>
+
+    <!-- FREE placement: no cost, no stuff, no resources on deconstruct -->
+    <costList />
+    <leaveResourcesWhenKilled>false</leaveResourcesWhenKilled>
+
+    <graphicData>
+      <!-- Matches Textures/Things/Companionship/CompanionSpot.png -->
+      <texPath>Things/Companionship/CompanionSpot</texPath>
+      <graphicClass>Graphic_Single</graphicClass>
+      <drawSize>(1,1)</drawSize>
+    </graphicData>
+
+    <!-- Where it shows up in the Architect menu -->
+    <designationCategory>Misc</designationCategory>
+
+    <!-- No research requirement -->
+    <researchPrerequisites />
+
+  </ThingDef>
+
+</Defs>

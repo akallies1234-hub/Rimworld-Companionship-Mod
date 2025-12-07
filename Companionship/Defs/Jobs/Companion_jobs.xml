@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+
+  <!-- =============================================== -->
+  <!--  Main Companion-side date job (the colonist)     -->
+  <!-- =============================================== -->
+
+  <JobDef>
+    <defName>DoCompanionDate</defName>
+    <driverClass>Riot.Companionship.JobDriver_CompanionDate</driverClass>
+    <reportString>providing companionship.</reportString>
+
+    <casualInterruptible>true</casualInterruptible>
+    <playerInterruptible>true</playerInterruptible>
+    <alwaysShowWeapon>false</alwaysShowWeapon>
+
+    <joyKind>Social</joyKind>
+  </JobDef>
+
+
+  <!-- =============================================== -->
+  <!--  Client-side date job (the visitor)              -->
+  <!-- =============================================== -->
+
+  <JobDef>
+    <defName>DoCompanionDate_Client</defName>
+    <driverClass>Riot.Companionship.JobDriver_CompanionDateClient</driverClass>
+    <reportString>enjoying companionship.</reportString>
+
+    <casualInterruptible>true</casualInterruptible>
+    <playerInterruptible>true</playerInterruptible>
+    <alwaysShowWeapon>false</alwaysShowWeapon>
+
+    <joyKind>Social</joyKind>
+  </JobDef>
+
+
+  <!-- =============================================== -->
+  <!--  Visitor waiting job at the Companion Spot       -->
+  <!-- =============================================== -->
+
+  <JobDef>
+    <defName>WaitForCompanionDate</defName>
+    <driverClass>Riot.Companionship.JobDriver_WaitForCompanionDate</driverClass>
+    <reportString>waiting for a companion.</reportString>
+
+    <casualInterruptible>false</casualInterruptible>
+    <playerInterruptible>true</playerInterruptible>
+    <alwaysShowWeapon>false</alwaysShowWeapon>
+
+    <joyKind>Social</joyKind>
+  </JobDef>
+
+</Defs>

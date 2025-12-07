@@ -1,0 +1,9 @@
+C:\SteamLibrary\steamapps\common\RimWorld\Mods\Companionship\Source\Companionship\Companionship\obj\Debug\Companionship.csproj.AssemblyReference.cache
+C:\SteamLibrary\steamapps\common\RimWorld\Mods\Companionship\Source\Companionship\Companionship\obj\Debug\Companionship.csproj.CoreCompileInputs.cache
+C:\SteamLibrary\steamapps\common\RimWorld\Mods\Companionship\Source\Companionship\Companionship\obj\Debug\Companionship.csproj.CopyComplete
+C:\SteamLibrary\steamapps\common\RimWorld\Mods\Companionship\Source\Companionship\Companionship\obj\Debug\Companionship.dll
+C:\SteamLibrary\steamapps\common\RimWorld\Mods\Companionship\Source\Companionship\Companionship\obj\Debug\Companionship.pdb
+C:\SteamLibrary\steamapps\common\RimWorld\Mods\Companionship\Companionship.dll
+C:\SteamLibrary\steamapps\common\RimWorld\Mods\Companionship\Companionship.pdb
+C:\SteamLibrary\steamapps\common\RimWorld\Mods\Companionship\Assemblies\Companionship.dll
+C:\SteamLibrary\steamapps\common\RimWorld\Mods\Companionship\Assemblies\Companionship.pdb

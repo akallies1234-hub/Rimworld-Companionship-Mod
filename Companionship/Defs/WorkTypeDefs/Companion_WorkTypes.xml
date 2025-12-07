@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+
+  <WorkTypeDef>
+    <defName>Companion</defName>
+
+    <!-- This is what shows up as the column header -->
+    <labelShort>Companion</labelShort>
+
+    <!-- These are used in various UI strings -->
+    <pawnLabel>companion</pawnLabel>
+    <gerundLabel>providing companionship</gerundLabel>
+
+    <!-- You can tweak these later -->
+    <naturalPriority>30</naturalPriority>
+    <alwaysStartActive>true</alwaysStartActive>
+  </WorkTypeDef>
+
+</Defs>
