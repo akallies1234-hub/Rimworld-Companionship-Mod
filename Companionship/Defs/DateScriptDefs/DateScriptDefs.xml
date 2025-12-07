@@ -2,7 +2,7 @@
 <Defs>
 
   <!-- Simple, low-tier script: walk together, then lovin -->
-  <Riot.Companionship.DateScriptDef>
+  <DateScriptDef Class="Riot.Companionship.DateScriptDef">
     <defName>SimpleWalkAndLovin_T1</defName>
     <label>simple walk and lovin</label>
     <tier>1</tier>
@@ -10,10 +10,10 @@
       <li>WalkTogether</li>
       <li>Lovin</li>
     </sequence>
-  </Riot.Companionship.DateScriptDef>
+  </DateScriptDef>
 
   <!-- More complex, higher-tier script: walk -> joy -> meal -> lovin -->
-  <Riot.Companionship.DateScriptDef>
+  <DateScriptDef Class="Riot.Companionship.DateScriptDef">
     <defName>PremiumEvening_T3</defName>
     <label>premium evening</label>
     <tier>3</tier>
@@ -23,6 +23,6 @@
       <li>MealTogether</li>
       <li>Lovin</li>
     </sequence>
-  </Riot.Companionship.DateScriptDef>
+  </DateScriptDef>
 
 </Defs>
