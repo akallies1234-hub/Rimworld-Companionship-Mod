@@ -19,16 +19,25 @@ namespace Riot.Companionship
     /// </summary>
     public class CompVisitorCompanionship : ThingComp
     {
-        private const float BaseInitialDesireChance = 0.35f;           // ~35% of visitors want companionship
-        private const float BaseAdditionalServiceChance = 0.25f;       // ~25% chance they want a second date
+        private const float BaseInitialDesireChance = 0.35f; // ~35% of visitors want companionship
+        private const float BaseAdditionalServiceChance = 0.25f; // ~25% chance they want a second date
+
+        // How long (in ticks) the pawn must be on the map before they will
+        // actually peel off and head to the Companion Spot.
+        // This lets the visitor group finish their "arrival" behavior first.
+        private const int MinTicksOnMapBeforeHeadingToSpot = 6000;
 
         private bool hasEvaluatedInitialDesire;
         private bool desiresCompanionship;
+
         private bool isWaitingForCompanion;
 
         private bool hasReceivedService;
         private bool hasRolledForAdditionalService;
         private bool wantsAdditionalService;
+
+        // Tracks how long this pawn has been present on the current map.
+        private int ticksOnMap;
 
         private Pawn Pawn => parent as Pawn;
 
@@ -62,6 +71,22 @@ namespace Riot.Companionship
         /// This is decided once, after their first completed date.
         /// </summary>
         public bool WantsAdditionalService => wantsAdditionalService;
+
+        // === Ticking ===
+
+        public override void CompTick()
+        {
+            base.CompTick();
+
+            Pawn pawn = Pawn;
+            if (pawn == null || !pawn.Spawned || pawn.Dead)
+            {
+                return;
+            }
+
+            // Simple "time on map" counter; used to delay heading to the CompanionSpot.
+            ticksOnMap++;
+        }
 
         public override void CompTickRare()
         {
@@ -100,8 +125,8 @@ namespace Riot.Companionship
             }
 
             hasEvaluatedInitialDesire = true;
-
             float chance = BaseInitialDesireChance;
+
             // TODO: Future: adjust by traits, needs, faction, storyteller, etc.
             desiresCompanionship = Rand.Value < chance;
         }
@@ -141,6 +166,12 @@ namespace Riot.Companionship
                 return;
             }
 
+            // Let the visitor group "arrive" before peeling off to the Companion Spot.
+            if (ticksOnMap < MinTicksOnMapBeforeHeadingToSpot)
+            {
+                return;
+            }
+
             // If they're already on the waiting job, don't re-issue it.
             if (pawn.CurJobDef == CompanionshipDefOf.WaitForCompanionDate)
             {
@@ -167,6 +198,11 @@ namespace Riot.Companionship
             }
 
             Job waitJob = JobMaker.MakeJob(CompanionshipDefOf.WaitForCompanionDate, spot);
+
+            // Explicitly WALK to the spot so it looks natural, not like a sprint.
+            waitJob.locomotionUrgency = LocomotionUrgency.Walk;
+            waitJob.ignoreJoyTimeAssignment = true;
+
             pawn.jobs.TryTakeOrderedJob(waitJob);
         }
 
@@ -184,8 +220,8 @@ namespace Riot.Companionship
             }
 
             hasRolledForAdditionalService = true;
-
             float chance = BaseAdditionalServiceChance;
+
             // TODO: Future: adjust based on how good the date was, needs, traits, etc.
             wantsAdditionalService = Rand.Value < chance;
         }
@@ -204,10 +240,15 @@ namespace Riot.Companionship
 
             Scribe_Values.Look(ref hasEvaluatedInitialDesire, "compVisitor_hasEvaluatedInitialDesire", false);
             Scribe_Values.Look(ref desiresCompanionship, "compVisitor_desiresCompanionship", false);
+
             Scribe_Values.Look(ref isWaitingForCompanion, "compVisitor_isWaitingForCompanion", false);
+
             Scribe_Values.Look(ref hasReceivedService, "compVisitor_hasReceivedService", false);
             Scribe_Values.Look(ref hasRolledForAdditionalService, "compVisitor_hasRolledForAdditionalService", false);
             Scribe_Values.Look(ref wantsAdditionalService, "compVisitor_wantsAdditionalService", false);
+
+            // Save our time-on-map counter so behavior is consistent across reloads.
+            Scribe_Values.Look(ref ticksOnMap, "compVisitor_ticksOnMap", 0);
         }
     }
 }
