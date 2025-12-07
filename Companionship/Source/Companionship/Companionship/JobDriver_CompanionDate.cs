@@ -17,12 +17,15 @@ namespace Riot.Companionship
     /// 2) When the Companion reaches the client, we start the client-side
     ///    JobDriver_CompanionDateClient so the visitor walks to the bed too.
     /// 3) Both move to the bed and the "date" sequence plays out.
-    /// 4) Outcome is calculated, payment is made (on success), comps are notified,
-    ///    and both jobs end.
+    /// 4) Outcome is calculated, payment is made, comps are notified, and both jobs end.
     /// </summary>
     public class JobDriver_CompanionDate : JobDriver
     {
-        private const int TicksDurationLovin = 400; // Placeholder duration; can be scripted later.
+        private const int TicksDurationLovin = 400; // Placeholder duration; will be script-driven later.
+
+        // The script selected for this particular date. For now we just choose it and
+        // don't change behavior; in the next step we'll use it to drive the Toil sequence.
+        private DateScriptDef selectedScript;
 
         protected Pawn Client => TargetA.Pawn;
         protected Building_Bed Bed => TargetB.Thing as Building_Bed;
@@ -45,6 +48,11 @@ namespace Riot.Companionship
 
         protected override IEnumerable<Toil> MakeNewToils()
         {
+            // Pick a date script for this job instance.
+            // For now, we don't alter the actual behavior; we just cache it so we can
+            // start using it in a later step.
+            selectedScript = DateScriptUtility.SelectScriptFor(pawn, Client);
+
             // Basic failure conditions.
             this.FailOnDestroyedNullOrForbidden(TargetIndex.A);
             this.FailOnDestroyedNullOrForbidden(TargetIndex.B);
@@ -55,7 +63,7 @@ namespace Riot.Companionship
             yield return Toils_Goto.GotoThing(TargetIndex.A, PathEndMode.Touch);
 
             // 2) Once we've reached the client, start the client-side date job so they
-            //    will head to the bed as well.
+            // will head to the bed as well.
             Toil startClientJob = new Toil
             {
                 initAction = () =>
@@ -76,20 +84,9 @@ namespace Riot.Companionship
                     clientJob.locomotionUrgency = LocomotionUrgency.Walk;
                     clientJob.ignoreJoyTimeAssignment = true;
 
-                    // Give the job to the visitor.
+                    // Give the job to the visitor. Using TryTakeOrderedJob keeps this
+                    // consistent with how we assign the waiting job.
                     client.jobs.TryTakeOrderedJob(clientJob);
-
-                    // Mark the visitor as no longer "waiting".
-                    CompVisitorCompanionship visitorComp = client.TryGetComp<CompVisitorCompanionship>();
-                    visitorComp?.ResetWaitingState();
-
-                    // Notify the companion's comp that a new date has started
-                    // (for daily limits).
-                    CompCompanionship comp = companion.TryGetComp<CompCompanionship>();
-                    if (comp != null)
-                    {
-                        comp.Notify_DateStarted(companion);
-                    }
                 },
                 defaultCompleteMode = ToilCompleteMode.Instant
             };
@@ -119,7 +116,7 @@ namespace Riot.Companionship
         /// <summary>
         /// Called at the end of the date sequence:
         /// - Calculates outcome and applies thoughts.
-        /// - Pays the Companion (Good/Excellent only).
+        /// - Pays the Companion.
         /// - Updates XP / stats via CompCompanionship.
         /// - Notifies the visitor comp that service was received.
         /// - Explicitly ends the client's job so they don't get stuck.
@@ -130,23 +127,17 @@ namespace Riot.Companionship
             Pawn client = Client;
             Building_Bed bed = Bed;
 
-            if (client == null || bed == null || companion.Map == null)
+            if (client == null || bed == null)
             {
                 return;
             }
 
-            // Calculate the outcome.
+            // Calculate the outcome and apply thoughts to both pawns.
             DateOutcome outcome = DateOutcomeUtility.CalculateOutcome(companion, client, bed);
-
-            // Apply outcome thoughts to both pawns.
             DateOutcomeUtility.ApplyDateOutcome(companion, client, outcome);
 
-            // Pay only for successful dates (Good / Excellent).
-            bool success = outcome >= DateOutcome.Good;
-            if (success)
-            {
-                PaymentUtility.PayForDate(companion, client, outcome, bed);
-            }
+            // Handle payment (spawns silver near the companion).
+            PaymentUtility.PayForDate(companion, client, outcome, bed);
 
             // Companion XP / tracking.
             CompCompanionship comp = companion.TryGetComp<CompCompanionship>();
@@ -160,7 +151,6 @@ namespace Riot.Companionship
             if (visitorComp != null)
             {
                 visitorComp.Notify_ServiceReceived();
-                visitorComp.ResetWaitingState();
             }
 
             // Explicitly end the client's current job (their client-side date job).

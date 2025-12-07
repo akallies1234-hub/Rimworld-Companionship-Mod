@@ -61,6 +61,7 @@
     <Compile Include="CompVisitorCompanionship.cs" />
     <Compile Include="DateOutcomeUtility.cs" />
     <Compile Include="DateScriptDef.cs" />
+    <Compile Include="DateScriptUtility.cs" />
     <Compile Include="GoToCompanionSpot.cs" />
     <Compile Include="JobDriver_CompanionDate.cs" />
     <Compile Include="JobDriver_CompanionDateClient.cs" />
