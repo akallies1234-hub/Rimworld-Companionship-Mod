@@ -3,12 +3,6 @@ using Verse;
 
 namespace Riot.Companionship
 {
-    /// <summary>
-    /// Central DefOf class for the Companionship mod.
-    /// 
-    /// IMPORTANT:
-    /// - Every field here must match a defName in XML.
-    /// </summary>
     [DefOf]
     public static class CompanionshipDefOf
     {
@@ -17,29 +11,16 @@ namespace Riot.Companionship
             DefOfHelper.EnsureInitializedInCtor(typeof(CompanionshipDefOf));
         }
 
-        // Work type for Companions.
-        public static WorkTypeDef Companion;
-
-        // Main Companion date jobs.
-        public static JobDef DoCompanionDate;
-        public static JobDef DoCompanionDate_Client;
-
-        // Visitor waiting job at the Companion Spot.
+        // Jobs
+        public static JobDef CompanionDate;
         public static JobDef WaitForCompanionDate;
+        public static JobDef GoToCompanionSpot;
 
-        // WorkGiver that assigns Companion date jobs.
-        public static WorkGiverDef DoCompanionDate_WorkGiver;
-
-        // Bed type used for Companion dates.
-        public static ThingDef CompanionBed;
-
-        // Spot where visitors wait for Companions.
+        // Buildings
         public static ThingDef CompanionSpot;
 
-        // Thoughts given based on date outcome.
-        public static ThoughtDef CompanionDate_Excellent;
-        public static ThoughtDef CompanionDate_Good;
-        public static ThoughtDef CompanionDate_Bad;
-        public static ThoughtDef CompanionDate_Terrible;
+        // Thoughts (temporary — will be upgraded in Phase 3)
+        public static ThoughtDef CompanionDate_Satisfied;
+        public static ThoughtDef CompanionDate_Dissatisfied;
     }
 }

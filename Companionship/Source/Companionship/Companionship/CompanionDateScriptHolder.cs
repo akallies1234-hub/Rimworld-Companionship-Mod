@@ -1,5 +1,5 @@
-﻿using System.Collections.Generic;
-using Verse;
+﻿using Verse;
+using System.Collections.Generic;
 
 namespace Riot.Companionship
 {
@@ -7,20 +7,20 @@ namespace Riot.Companionship
     {
         private static readonly Dictionary<Pawn, DateScriptDef> scriptMap = new Dictionary<Pawn, DateScriptDef>();
 
-        public static void Set(Pawn pawn, DateScriptDef script)
+        public static void Set(Pawn companion, DateScriptDef script)
         {
-            scriptMap[pawn] = script;
+            scriptMap[companion] = script;
         }
 
-        public static DateScriptDef Get(Pawn pawn)
+        public static DateScriptDef Get(Pawn companion)
         {
-            scriptMap.TryGetValue(pawn, out var script);
+            scriptMap.TryGetValue(companion, out var script);
             return script;
         }
 
-        public static void Clear(Pawn pawn)
+        public static void Clear(Pawn companion)
         {
-            scriptMap.Remove(pawn);
+            scriptMap.Remove(companion);
         }
     }
 }

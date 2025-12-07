@@ -17,13 +17,16 @@ namespace Riot.Companionship
 
             yield return Toils_Goto.GotoCell(TargetIndex.A, PathEndMode.InteractionCell);
 
-            Toil arrival = new Toil();
-            arrival.initAction = () =>
+            Toil arrival = new Toil
             {
-                VisitorComp?.Notify_ArrivedAtSpot(VisitorPawn);
-                ReadyForNextToil();
+                initAction = () =>
+                {
+                    VisitorComp?.Notify_ArrivedAtSpot(VisitorPawn);
+                    ReadyForNextToil();
+                },
+                defaultCompleteMode = ToilCompleteMode.Instant
             };
-            arrival.defaultCompleteMode = ToilCompleteMode.Instant;
+
             yield return arrival;
         }
     }

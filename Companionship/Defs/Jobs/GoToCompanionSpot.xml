@@ -1,0 +1,5 @@
+<JobDef>
+    <defName>GoToCompanionSpot</defName>
+    <driverClass>Riot.Companionship.JobDriver_GoToCompanionSpot</driverClass>
+    <reportString>going to companion spot</reportString>
+</JobDef>

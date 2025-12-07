@@ -13,17 +13,14 @@ namespace Riot.Companionship
         {
             this.FailOnDestroyedNullOrForbidden(TargetIndex.A);
 
-            Toil wait = new Toil();
-            wait.initAction = () =>
+            Toil wait = new Toil
             {
-                pawn.pather.StopDead();
+                initAction = () => pawn.pather.StopDead(),
+                defaultCompleteMode = ToilCompleteMode.Never,
+                tickAction = () => pawn.rotationTracker.FaceTarget(TargetA),
+                socialMode = RandomSocialMode.Off
             };
-            wait.defaultCompleteMode = ToilCompleteMode.Never;
-            wait.tickAction = () =>
-            {
-                pawn.rotationTracker.FaceTarget(TargetA);
-            };
-            wait.socialMode = RandomSocialMode.Off;
+
             yield return wait;
         }
     }

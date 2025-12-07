@@ -59,6 +59,7 @@
     <Compile Include="CompanionshipMod.cs" />
     <Compile Include="CompanionshipUtility.cs" />
     <Compile Include="CompCompanionship.cs" />
+    <Compile Include="CompSpotUtility.cs" />
     <Compile Include="CompVisitorCompanionship.cs" />
     <Compile Include="DateOutcomeUtility.cs" />
     <Compile Include="DateScriptDef.cs" />

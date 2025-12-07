@@ -21,11 +21,11 @@ namespace Riot.Companionship
             if (client == null) return false;
             if (client == companion) return false;
 
-            if (!client.Spawned || client.Downed || client.Dead) return false;
+            if (!client.Spawned || client.Dead || client.Downed) return false;
             if (!client.RaceProps.Humanlike) return false;
             if (client.Faction == null || client.Faction.IsPlayer) return false;
 
-            CompVisitorCompanionship comp = client.TryGetComp<CompVisitorCompanionship>();
+            var comp = client.TryGetComp<CompVisitorCompanionship>();
             if (comp == null || !comp.IsWaiting) return false;
 
             if (client.CurJob == null ||
@@ -34,13 +34,11 @@ namespace Riot.Companionship
 
             Thing spot = CompSpotUtility.GetClosestSpot(client);
             if (spot == null) return false;
-
-            if (client.Position.DistanceTo(spot.Position) > 10f) return false;
+            if (client.Position.DistanceToSquared(spot.Position) > 100) return false;
 
             if (!companion.CanReserve(client)) return false;
             if (!companion.CanReach(client, PathEndMode.Touch, Danger.None)) return false;
 
-            // Script selection
             var script = DateScriptUtility.SelectScriptFor(companion, client);
             if (script == null) return false;
 
@@ -55,12 +53,10 @@ namespace Riot.Companionship
             var script = DateScriptUtility.SelectScriptFor(companion, client);
             if (script == null) return null;
 
-            Job job = JobMaker.MakeJob(CompanionshipDefOf.CompanionDate, client);
-            job.playerForced = forced;
-
-            // We attach script later inside JobDriver_CompanionDate
             CompanionDateScriptHolder.Set(companion, script);
 
+            Job job = JobMaker.MakeJob(CompanionshipDefOf.CompanionDate, client);
+            job.playerForced = forced;
             return job;
         }
     }

@@ -1,230 +1,200 @@
 ﻿using System.Collections.Generic;
-using RimWorld;
 using Verse;
 using Verse.AI;
-using UnityEngine;
+using RimWorld;
 
 namespace Riot.Companionship
 {
-    /// <summary>
-    /// Companion-side job driver for performing a Tier 1 date.
-    ///
-    /// Flow:
-    /// 1) Companion walks to client at the Companion Spot
-    /// 2) Pre-lovin conversation (500 ticks, face each other, progress bar)
-    /// 3) Client receives their client-side job and walks to the bed
-    /// 4) Companion walks to the bed (no sprinting)
-    /// 5) Lovin stage (600 ticks with heart motes)
-    /// 6) Outcome + payment + XP
-    /// 7) Clean termination of both jobs
-    /// </summary>
     public class JobDriver_CompanionDate : JobDriver
     {
-        private const int TicksConversation = 500;
-        private const int TicksLovin = 600;
+        private Pawn Companion => pawn;                  // The worker doing the service
+        private Pawn Client => (Pawn)job.targetA.Thing;  // The visitor requesting service
+        private Building_Bed Bed => (Building_Bed)job.targetB.Thing;
 
         private DateScriptDef selectedScript;
-
-        protected Pawn Client => TargetA.Pawn;
-        protected Building_Bed Bed => TargetB.Thing as Building_Bed;
+        private int scriptStepIndex = 0;
+        private int socialTicks = 0;
+        private const int PreSocialDuration = 500;       // 500 ticks ≈ 8.3 seconds
 
         public override bool TryMakePreToilReservations(bool errorOnFailed)
         {
-            Pawn client = Client;
-            Building_Bed bed = Bed;
+            if (Client == null || Bed == null) return false;
 
-            if (client == null || bed == null)
-                return false;
+            return pawn.Reserve(Client, job, 1, -1, null, errorOnFailed)
+                && pawn.Reserve(Bed, job, 1, -1, null, errorOnFailed);
+        }
 
-            bool r1 = pawn.Reserve(client, job, 1, -1, null, errorOnFailed);
-            bool r2 = pawn.Reserve(bed, job, 1, -1, null, errorOnFailed);
-            return r1 && r2;
+        // Called by WorkGiver before job starts
+        public void SetSelectedScript(DateScriptDef script)
+        {
+            selectedScript = script;
         }
 
         protected override IEnumerable<Toil> MakeNewToils()
         {
-            selectedScript = DateScriptUtility.SelectScriptFor(pawn, Client);
+            if (selectedScript == null)
+            {
+                Log.Error("[Companionship] JobDriver_CompanionDate started with NO selected script!");
+                yield break;
+            }
 
-            if (job != null)
-                job.locomotionUrgency = LocomotionUrgency.Walk;
+            // Fail if client despawns or becomes downed
+            this.FailOn(() => Client == null || Client.Dead || Client.Downed);
 
-            this.FailOnDestroyedNullOrForbidden(TargetIndex.A);
-            this.FailOnDestroyedNullOrForbidden(TargetIndex.B);
-            this.FailOnDowned(TargetIndex.A);
-            this.FailOn(() => Client?.Map != pawn.Map);
-
-            // 1) Walk to the client
+            // ---------------------------
+            // 1. Move companion to client
+            // ---------------------------
             yield return Toils_Goto.GotoThing(TargetIndex.A, PathEndMode.Touch);
 
-            // 2) Conversation stage
-            yield return MakeConversationToil();
+            // ---------------------------
+            // 2. Pre-lovin social phase
+            // ---------------------------
+            yield return PreLovinConversationToil();
 
-            // 3) Start client-side date job
-            yield return StartClientJobToil();
+            // ---------------------------
+            // 3. Walk companion + client to the bed
+            // ---------------------------
+            foreach (var t in WalkBothToBedToils())
+                yield return t;
 
-            // 4) Companion walks to the bed
-            yield return Toils_Goto.GotoThing(TargetIndex.B, PathEndMode.OnCell);
+            // ---------------------------
+            // 4. Perform lovin
+            // ---------------------------
+            yield return LovinToil();
 
-            // 5) Lovin stage
-            yield return MakeLovinToil();
-
-            // 6) Finish
-            Toil finish = new Toil();
-            finish.initAction = FinishDate;
-            finish.defaultCompleteMode = ToilCompleteMode.Instant;
-            yield return finish;
+            // ---------------------------
+            // 5. Finish the date: payment + thoughts
+            // ---------------------------
+            yield return FinishDateToil();
         }
 
-        // ------------------------------
-        //   CONVERSATION STAGE
-        // ------------------------------
-        private Toil MakeConversationToil()
+
+        // ============================================================
+        //  PRE-LOVIN SOCIAL TOIL — they face each other + talk effect
+        // ============================================================
+        private Toil PreLovinConversationToil()
         {
             Toil toil = new Toil();
-            toil.defaultDuration = TicksConversation;
-            toil.defaultCompleteMode = ToilCompleteMode.Delay;
-
             toil.initAction = () =>
             {
-                Pawn companion = pawn;
-                Pawn client = Client;
+                socialTicks = 0;
 
-                if (client != null && client.Spawned)
-                {
-                    companion.rotationTracker.FaceTarget(client);
-                    client.rotationTracker.FaceTarget(companion);
-                }
+                Companion.rotationTracker.FaceCell(Client.Position);
+                Client.rotationTracker.FaceCell(Companion.Position);
+
+                // Stop the client from wandering away during pre-social
+                Client.pather.StopDead();
             };
 
             toil.tickAction = () =>
             {
-                Pawn companion = pawn;
-                Pawn client = Client;
+                socialTicks++;
 
-                if (client != null && client.Spawned)
+                // Continuously face each other
+                Companion.rotationTracker.FaceCell(Client.Position);
+                Client.rotationTracker.FaceCell(Companion.Position);
+
+                // Show social interaction motes
+                if (socialTicks % 150 == 0)
                 {
-                    companion.rotationTracker.FaceTarget(client);
-                    client.rotationTracker.FaceTarget(companion);
+                    MoteMaker.ThrowText(Client.DrawPos, Client.Map, "chat");
+                    MoteMaker.ThrowText(Companion.DrawPos, Companion.Map, "chat");
                 }
+
+                if (socialTicks >= PreSocialDuration)
+                    ReadyForNextToil();
             };
 
-            toil.WithProgressBarToilDelay(TargetIndex.A);
-            toil.socialMode = RandomSocialMode.SuperActive;
-
+            toil.defaultDuration = PreSocialDuration;
+            toil.defaultCompleteMode = ToilCompleteMode.Never;
             return toil;
         }
 
-        // ------------------------------
-        //   START CLIENT-SIDE JOB
-        // ------------------------------
-        private Toil StartClientJobToil()
+
+        // ============================================================
+        //  MOVE BOTH TO BED — true paired walk (non-sprinting)
+        // ============================================================
+        private IEnumerable<Toil> WalkBothToBedToils()
+        {
+            // Companion walks normally
+            yield return Toils_Goto.GotoThing(TargetIndex.B, PathEndMode.Touch);
+
+            // Client follows at same speed
+            Toil clientFollow = new Toil();
+            clientFollow.initAction = () =>
+            {
+                Client.jobs.StopAll();
+                Client.pather.StartPath(Bed.InteractionCell, PathEndMode.Touch);
+                Client.pather.moveSpeed = Pawn_MovementSpeed.Walk; // force walking
+            };
+            clientFollow.defaultCompleteMode = ToilCompleteMode.Delay;
+            clientFollow.defaultDuration = 1;
+            yield return clientFollow;
+
+            // Ensure both are at the bedside
+            Toil wait = new Toil();
+            wait.defaultCompleteMode = ToilCompleteMode.Delay;
+            wait.defaultDuration = 30;
+            yield return wait;
+        }
+
+
+        // ============================================================
+        //  LOVIN TOIL — use real vanilla-style lay-down lovin
+        // ============================================================
+        private Toil LovinToil()
+        {
+            Toil toil = new Toil();
+
+            toil.initAction = () =>
+            {
+                if (!Bed.Owners.Contains(Companion))
+                    Bed.CompAssignableToPawn.ForceAddPawn(Companion);
+
+                if (!Bed.Owners.Contains(Client))
+                    Bed.CompAssignableToPawn.ForceAddPawn(Client);
+
+                Companion.pather.StopDead();
+                Client.pather.StopDead();
+
+                Companion.jobs.StartJob(JobMaker.MakeJob(JobDefOf.Lovin, Client, Bed),
+                    JobCondition.InterruptForced);
+
+                Client.jobs.StartJob(JobMaker.MakeJob(JobDefOf.Lovin, Companion, Bed),
+                    JobCondition.InterruptForced);
+            };
+
+            toil.defaultCompleteMode = ToilCompleteMode.Delay;
+            toil.defaultDuration = 600; // ≈ 10 seconds
+            return toil;
+        }
+
+
+        // ============================================================
+        //   FINISH THE DATE — payment + outcome + state reset
+        // ============================================================
+        private Toil FinishDateToil()
         {
             Toil toil = new Toil();
             toil.initAction = () =>
             {
-                Pawn client = Client;
-                Building_Bed bed = Bed;
+                // Payment
+                PaymentUtility.HandlePayment(Companion, Client);
 
-                if (client == null || bed == null || !client.Spawned)
-                    return;
+                // Outcome thoughts (placeholder)
+                DateOutcomeUtility.ApplyOutcomeThoughts(Companion, Client, true);
 
-                Job clientJob = JobMaker.MakeJob(CompanionshipDefOf.DoCompanionDate_Client, pawn, bed);
-                clientJob.locomotionUrgency = LocomotionUrgency.Walk;
-                clientJob.ignoreJoyTimeAssignment = true;
+                // Mark the client's comp state
+                var vcomp = Client.GetComp<CompVisitorCompanionship>();
+                vcomp?.Notify_ServiceReceived();
 
-                client.jobs.TryTakeOrderedJob(clientJob);
+                // End their jobs
+                Client.jobs.EndCurrentJob(JobCondition.Succeeded);
+                Companion.jobs.EndCurrentJob(JobCondition.Succeeded);
             };
 
             toil.defaultCompleteMode = ToilCompleteMode.Instant;
             return toil;
-        }
-
-        // ------------------------------
-        //   LOVIN STAGE
-        // ------------------------------
-        private Toil MakeLovinToil()
-        {
-            Toil toil = new Toil();
-            toil.defaultDuration = TicksLovin;
-            toil.defaultCompleteMode = ToilCompleteMode.Delay;
-
-            toil.initAction = () =>
-            {
-                Pawn companion = pawn;
-                Pawn client = Client;
-
-                if (client != null && client.Spawned)
-                {
-                    companion.rotationTracker.FaceTarget(client);
-                    client.rotationTracker.FaceTarget(companion);
-                }
-            };
-
-            toil.tickAction = () =>
-            {
-                Pawn companion = pawn;
-                Pawn client = Client;
-                Building_Bed bed = Bed;
-
-                if (client != null && client.Spawned)
-                {
-                    companion.rotationTracker.FaceTarget(client);
-                    client.rotationTracker.FaceTarget(companion);
-                }
-
-                // Throw heart text motes
-                if (bed != null && bed.Spawned)
-                {
-                    if (Find.TickManager.TicksGame % 120 == 0)
-                    {
-                        MoteMaker.ThrowText(
-                            bed.Position.ToVector3Shifted(),
-                            bed.Map,
-                            "♥",
-                            Color.red
-                        );
-                    }
-                }
-            };
-
-            toil.WithProgressBarToilDelay(TargetIndex.A);
-            toil.socialMode = RandomSocialMode.SuperActive;
-
-            return toil;
-        }
-
-        // ------------------------------
-        //   FINISH STAGE
-        // ------------------------------
-        private void FinishDate()
-        {
-            Pawn companion = pawn;
-            Pawn client = Client;
-            Building_Bed bed = Bed;
-
-            if (client == null || bed == null)
-                return;
-
-            // Outcome + thoughts
-            DateOutcome outcome = DateOutcomeUtility.CalculateOutcome(companion, client, bed);
-            DateOutcomeUtility.ApplyDateOutcome(companion, client, outcome);
-
-            // Payment
-            PaymentUtility.PayForDate(companion, client, outcome, bed);
-
-            // Companion XP / tracking
-            CompCompanionship comp = companion.TryGetComp<CompCompanionship>();
-            comp?.Notify_DateFinished(outcome);
-
-            // Visitor tracking
-            CompVisitorCompanionship visitorComp = client.TryGetComp<CompVisitorCompanionship>();
-            visitorComp?.Notify_ServiceReceived();
-
-            // End client job
-            client.jobs?.EndCurrentJob(JobCondition.Succeeded);
-
-            // End companion job
-            companion.jobs?.EndCurrentJob(JobCondition.Succeeded);
         }
     }
 }
