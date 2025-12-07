@@ -1,66 +1,62 @@
 ﻿using RimWorld;
-using System.Collections.Generic;
 using Verse;
 using Verse.AI;
+using System.Collections.Generic;
 
 namespace Riot.Companionship
 {
     /// <summary>
-    /// Visitor job: go to a Companion Spot and wait there for a Companion.
-    /// 
-    /// Job target A: the Companion Spot (Building_CompanionSpot).
-    /// 
-    /// While this job is active, CompVisitorCompanionship.IsWaitingForCompanion is true,
-    /// which prevents us from re-queueing the wait job over and over.
+    /// Visitor job: wait at the Companion Spot until a Companion comes.
+    /// This job DOES NOT move the pawn; they must already be at the spot.
     /// </summary>
     public class JobDriver_WaitForCompanionDate : JobDriver
     {
-        private Building_CompanionSpot Spot => TargetA.Thing as Building_CompanionSpot;
+        private TargetIndex SpotIndex = TargetIndex.A;
 
         public override bool TryMakePreToilReservations(bool errorOnFailed)
         {
-            // We don't need to reserve the spot (it's like a party spot).
+            // No reservation needed for a Companion Spot
             return true;
         }
 
         protected override IEnumerable<Toil> MakeNewToils()
         {
-            this.FailOnDespawnedOrNull(TargetIndex.A);
+            this.FailOnDestroyedNullOrForbidden(SpotIndex);
 
-            // 1) Go stand on (or adjacent to) the Companion Spot.
-            yield return Toils_Goto.GotoThing(TargetIndex.A, PathEndMode.Touch);
-
-            // 2) Wait there until a Companion comes to start the date.
-            Toil wait = new Toil();
-
-            wait.initAction = delegate
+            // 1) Begin waiting
+            Toil wait = new Toil
             {
-                Pawn pawn = this.pawn;
-                if (pawn == null)
-                    return;
-
-                CompVisitorCompanionship comp = pawn.TryGetComp<CompVisitorCompanionship>();
-                if (comp != null)
+                initAction = () =>
                 {
-                    comp.IsWaitingForCompanion = true;
-                }
+                    Pawn pawn = this.pawn;
+
+                    CompVisitorCompanionship comp = pawn.TryGetComp<CompVisitorCompanionship>();
+                    if (comp != null)
+                    {
+                        comp.IsWaitingForCompanion = true;
+                    }
+                },
+
+                // Never auto-complete — this job ends only when interrupted by a Companion.
+                defaultCompleteMode = ToilCompleteMode.Never
             };
 
-            wait.AddFinishAction(delegate
+            // Add finish action to clear the waiting flag
+            wait.AddFinishAction(() =>
             {
                 Pawn pawn = this.pawn;
-                if (pawn == null)
-                    return;
 
                 CompVisitorCompanionship comp = pawn.TryGetComp<CompVisitorCompanionship>();
                 if (comp != null)
                 {
-                    comp.ResetWaitingState();
+                    comp.IsWaitingForCompanion = false;
                 }
             });
 
-            wait.defaultCompleteMode = ToilCompleteMode.Never;
+            // Social mode makes the pawn animate naturally instead of freezing
             wait.socialMode = RandomSocialMode.SuperActive;
+
+            // Random facing makes the pawn look alive instead of rigid
             wait.handlingFacing = true;
 
             yield return wait;

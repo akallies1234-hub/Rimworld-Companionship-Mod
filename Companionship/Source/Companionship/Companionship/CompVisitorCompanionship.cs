@@ -19,12 +19,11 @@ namespace Riot.Companionship
     /// </summary>
     public class CompVisitorCompanionship : ThingComp
     {
-        private const float BaseInitialDesireChance = 0.35f;       // ~35% of visitors want companionship
-        private const float BaseAdditionalServiceChance = 0.25f;   // ~25% chance they want a second date
+        private const float BaseInitialDesireChance = 0.35f;           // ~35% of visitors want companionship
+        private const float BaseAdditionalServiceChance = 0.25f;       // ~25% chance they want a second date
 
         private bool hasEvaluatedInitialDesire;
         private bool desiresCompanionship;
-
         private bool isWaitingForCompanion;
 
         private bool hasReceivedService;
@@ -104,7 +103,6 @@ namespace Riot.Companionship
 
             float chance = BaseInitialDesireChance;
             // TODO: Future: adjust by traits, needs, faction, storyteller, etc.
-
             desiresCompanionship = Rand.Value < chance;
         }
 
@@ -189,7 +187,6 @@ namespace Riot.Companionship
 
             float chance = BaseAdditionalServiceChance;
             // TODO: Future: adjust based on how good the date was, needs, traits, etc.
-
             wantsAdditionalService = Rand.Value < chance;
         }
 
@@ -207,9 +204,7 @@ namespace Riot.Companionship
 
             Scribe_Values.Look(ref hasEvaluatedInitialDesire, "compVisitor_hasEvaluatedInitialDesire", false);
             Scribe_Values.Look(ref desiresCompanionship, "compVisitor_desiresCompanionship", false);
-
             Scribe_Values.Look(ref isWaitingForCompanion, "compVisitor_isWaitingForCompanion", false);
-
             Scribe_Values.Look(ref hasReceivedService, "compVisitor_hasReceivedService", false);
             Scribe_Values.Look(ref hasRolledForAdditionalService, "compVisitor_hasRolledForAdditionalService", false);
             Scribe_Values.Look(ref wantsAdditionalService, "compVisitor_wantsAdditionalService", false);

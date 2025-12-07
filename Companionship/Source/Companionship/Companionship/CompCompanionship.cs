@@ -17,6 +17,7 @@ namespace Riot.Companionship
         private int xp = 0;
         private int datesCompleted = 0;
         private int successfulDates = 0;
+
         private int datesCompletedToday = 0;
         private int lastDateDay = -1;
 
@@ -43,12 +44,17 @@ namespace Riot.Companionship
 
         private int MaxDatesPerDay
         {
-            get { return CurrentTier; }
+            get
+            {
+                // Simple rule: max dates per day = current tier.
+                return CurrentTier;
+            }
         }
 
         public void RecordDate(bool success)
         {
             datesCompleted++;
+
             if (success)
             {
                 successfulDates++;
@@ -66,6 +72,7 @@ namespace Riot.Companionship
         public bool CanStartDateNow(Pawn pawn)
         {
             int day = GenLocalDate.DayOfYear(pawn);
+
             if (day != lastDateDay)
             {
                 lastDateDay = day;
@@ -81,6 +88,7 @@ namespace Riot.Companionship
         public void Notify_DateStarted(Pawn pawn)
         {
             int day = GenLocalDate.DayOfYear(pawn);
+
             if (day != lastDateDay)
             {
                 lastDateDay = day;
@@ -88,6 +96,24 @@ namespace Riot.Companionship
             }
 
             datesCompletedToday++;
+        }
+
+        /// <summary>
+        /// Notify the comp that a date has finished with the given outcome.
+        /// Handles total counts and XP.
+        /// </summary>
+        public void Notify_DateFinished(DateOutcome outcome)
+        {
+            // For now we treat Good/Excellent as "success".
+            bool success = outcome >= DateOutcome.Good;
+
+            RecordDate(success);
+
+            // XP rule:
+            // - Success (Good / Excellent): +2 XP
+            // - Failure / Neutral: +1 XP
+            int xpGain = success ? 2 : 1;
+            AddXP(xpGain);
         }
 
         public override string CompInspectStringExtra()
@@ -102,7 +128,6 @@ namespace Riot.Companionship
 
             string tierName = GetTierTitle(CurrentTier);
             int nextTierXP = GetXPThresholdForTier(CurrentTier + 1);
-
             int estimated = PaymentUtility.EstimateBasePaymentWithoutTip(pawn);
 
             string progressLine;
@@ -152,18 +177,12 @@ namespace Riot.Companionship
         {
             switch (tier)
             {
-                case 1:
-                    return "Novice Companion";
-                case 2:
-                    return "Seasoned Companion";
-                case 3:
-                    return "Esteemed Companion";
-                case 4:
-                    return "Elite Companion";
-                case 5:
-                    return "Legendary Companion";
-                default:
-                    return "Companion";
+                case 1: return "Novice Companion";
+                case 2: return "Seasoned Companion";
+                case 3: return "Esteemed Companion";
+                case 4: return "Elite Companion";
+                case 5: return "Legendary Companion";
+                default: return "Companion";
             }
         }
 

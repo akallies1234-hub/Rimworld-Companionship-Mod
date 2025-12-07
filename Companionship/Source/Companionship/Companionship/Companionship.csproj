@@ -60,6 +60,7 @@
     <Compile Include="CompCompanionship.cs" />
     <Compile Include="CompVisitorCompanionship.cs" />
     <Compile Include="DateOutcomeUtility.cs" />
+    <Compile Include="GoToCompanionSpot.cs" />
     <Compile Include="JobDriver_CompanionDate.cs" />
     <Compile Include="JobDriver_CompanionDateClient.cs" />
     <Compile Include="JobDriver_WaitForCompanionDate.cs" />

@@ -7,17 +7,18 @@ namespace Riot.Companionship
 {
     /// <summary>
     /// Main Companion-side job driver for performing a date with a client.
-    /// 
+    ///
     /// Targets:
-    ///  - TargetA: client Pawn
-    ///  - TargetB: CompanionBed building
-    /// 
+    /// - TargetA: client Pawn
+    /// - TargetB: CompanionBed building
+    ///
     /// Flow:
     /// 1) Companion goes to the client (who should be waiting at a Companion Spot).
     /// 2) When the Companion reaches the client, we start the client-side
     ///    JobDriver_CompanionDateClient so the visitor walks to the bed too.
     /// 3) Both move to the bed and the "date" sequence plays out.
-    /// 4) Outcome is calculated, payment is made, comps are notified, and both jobs end.
+    /// 4) Outcome is calculated, payment is made (on success), comps are notified,
+    ///    and both jobs end.
     /// </summary>
     public class JobDriver_CompanionDate : JobDriver
     {
@@ -69,15 +70,26 @@ namespace Riot.Companionship
                     }
 
                     // Build the client-side date job:
-                    //  - TargetA: the Companion pawn
-                    //  - TargetB: the same bed
+                    // - TargetA: the Companion pawn
+                    // - TargetB: the same bed
                     Job clientJob = JobMaker.MakeJob(CompanionshipDefOf.DoCompanionDate_Client, companion, bed);
                     clientJob.locomotionUrgency = LocomotionUrgency.Walk;
                     clientJob.ignoreJoyTimeAssignment = true;
 
-                    // Give the job to the visitor. Using TryTakeOrderedJob keeps this
-                    // consistent with how we assign the waiting job.
+                    // Give the job to the visitor.
                     client.jobs.TryTakeOrderedJob(clientJob);
+
+                    // Mark the visitor as no longer "waiting".
+                    CompVisitorCompanionship visitorComp = client.TryGetComp<CompVisitorCompanionship>();
+                    visitorComp?.ResetWaitingState();
+
+                    // Notify the companion's comp that a new date has started
+                    // (for daily limits).
+                    CompCompanionship comp = companion.TryGetComp<CompCompanionship>();
+                    if (comp != null)
+                    {
+                        comp.Notify_DateStarted(companion);
+                    }
                 },
                 defaultCompleteMode = ToilCompleteMode.Instant
             };
@@ -107,7 +119,7 @@ namespace Riot.Companionship
         /// <summary>
         /// Called at the end of the date sequence:
         /// - Calculates outcome and applies thoughts.
-        /// - Pays the Companion (if outcome warrants it).
+        /// - Pays the Companion (Good/Excellent only).
         /// - Updates XP / stats via CompCompanionship.
         /// - Notifies the visitor comp that service was received.
         /// - Explicitly ends the client's job so they don't get stuck.
@@ -118,19 +130,23 @@ namespace Riot.Companionship
             Pawn client = Client;
             Building_Bed bed = Bed;
 
-            if (client == null || bed == null)
+            if (client == null || bed == null || companion.Map == null)
             {
                 return;
             }
 
-            Map map = companion.Map;
-
-            // Calculate the outcome and apply thoughts.
+            // Calculate the outcome.
             DateOutcome outcome = DateOutcomeUtility.CalculateOutcome(companion, client, bed);
-            DateOutcomeUtility.ApplyOutcomeThoughts(client, outcome);
 
-            // Handle payment.
-            PaymentUtility.HandlePayment(companion, client, outcome, map);
+            // Apply outcome thoughts to both pawns.
+            DateOutcomeUtility.ApplyDateOutcome(companion, client, outcome);
+
+            // Pay only for successful dates (Good / Excellent).
+            bool success = outcome >= DateOutcome.Good;
+            if (success)
+            {
+                PaymentUtility.PayForDate(companion, client, outcome, bed);
+            }
 
             // Companion XP / tracking.
             CompCompanionship comp = companion.TryGetComp<CompCompanionship>();
@@ -144,6 +160,7 @@ namespace Riot.Companionship
             if (visitorComp != null)
             {
                 visitorComp.Notify_ServiceReceived();
+                visitorComp.ResetWaitingState();
             }
 
             // Explicitly end the client's current job (their client-side date job).

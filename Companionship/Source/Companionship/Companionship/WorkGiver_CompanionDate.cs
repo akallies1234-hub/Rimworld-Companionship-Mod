@@ -1,121 +1,132 @@
-﻿using RimWorld;
+﻿using System.Collections.Generic;
+using System.Linq;
+using RimWorld;
 using Verse;
 using Verse.AI;
-using System.Collections.Generic;
 
 namespace Riot.Companionship
 {
-    /// <summary>
-    /// Work giver that assigns Companion pawns to perform dates with visiting clients.
-    /// 
-    /// Scanner logic:
-    /// - Scans all humanlike pawns on the map as potential clients.
-    /// - Filters to visitors/guests that:
-    ///     * Have CompVisitorCompanionship,
-    ///     * Desire companionship,
-    ///     * Are actively waiting for a companion at a Companion Spot.
-    /// - For each valid client, finds a Companion who:
-    ///     * Is a valid worker (CompanionshipUtility.IsPotentialCompanion),
-    ///     * Has CompCompanionship and can start a date now,
-    ///     * Can reach and reserve the client and a CompanionBed.
-    /// 
-    /// This keeps the core "who works / who gets service" logic centralized
-    /// while remaining modular and easy to extend later.
-    /// </summary>
     public class WorkGiver_CompanionDate : WorkGiver_Scanner
     {
-        public override PathEndMode PathEndMode => PathEndMode.Touch;
+        // How far from the Companion Spot a client can be and still count as "waiting".
+        // 10 tiles is a generous radius that should feel good in-game.
+        private const float MaxDistanceFromSpotSquared = 10f * 10f;
+
+        public override PathEndMode PathEndMode => PathEndMode.ClosestTouch;
+
+        public override ThingRequest PotentialWorkThingRequest => ThingRequest.ForGroup(ThingRequestGroup.Pawn);
+
+        public override bool Prioritized => false;
 
         /// <summary>
-        /// We scan pawns, not buildings.
+        /// We scan all humanlike pawns on the map as potential clients.
+        /// The heavy filtering happens in HasJobOnThing.
         /// </summary>
         public override IEnumerable<Thing> PotentialWorkThingsGlobal(Pawn pawn)
         {
             Map map = pawn.Map;
             if (map == null)
-                yield break;
-
-            // Iterate all spawned humanlike pawns on the map.
-            List<Pawn> allPawns = map.mapPawns.AllPawnsSpawned;
-            for (int i = 0; i < allPawns.Count; i++)
             {
-                Pawn other = allPawns[i];
-                if (other == null || other == pawn)
-                    continue;
+                yield break;
+            }
 
-                if (!other.RaceProps.Humanlike)
-                    continue;
-
-                yield return other;
+            foreach (Pawn otherPawn in map.mapPawns.AllPawnsSpawned)
+            {
+                if (otherPawn != pawn && otherPawn.RaceProps.Humanlike)
+                {
+                    yield return otherPawn;
+                }
             }
         }
 
-        /// <summary>
-        /// High-level "can we do a date with this specific client right now?"
-        /// This is called per client from PotentialWorkThingsGlobal.
-        /// </summary>
         public override bool HasJobOnThing(Pawn pawn, Thing t, bool forced = false)
         {
-            // Worker sanity.
-            if (!CompanionshipUtility.IsPotentialCompanion(pawn))
+            // Basic sanity checks
+            if (pawn == null || pawn.Dead || pawn.Downed)
+            {
                 return false;
+            }
 
             Pawn client = t as Pawn;
-            if (client == null)
+            if (client == null || client.Dead || client.Downed || client == pawn)
+            {
                 return false;
+            }
 
-            // Client must be a valid non-player humanlike.
+            // Is this pawn even allowed to be a companion?
+            if (!CompanionshipUtility.IsPotentialCompanion(pawn))
+            {
+                return false;
+            }
+
+            // Is this pawn even a valid client (visitor / non-player humanlike)?
             if (!CompanionshipUtility.IsPotentialClient(client))
+            {
                 return false;
+            }
 
+            // Future hook: needs/traits/etc.
             if (!CompanionshipUtility.HasActiveCompanionshipNeed(client))
+            {
                 return false;
+            }
 
-            // Visitor-side comp: are they actually interested and waiting?
+            // We must be able to reserve the client.
+            if (!pawn.CanReserve(client, 1, -1, null, forced))
+            {
+                return false;
+            }
+
+            // Visitor companionship state
             CompVisitorCompanionship visitorComp = client.TryGetComp<CompVisitorCompanionship>();
             if (visitorComp == null)
+            {
                 return false;
+            }
 
-            // Must actually desire companionship.
-            if (!visitorComp.DesiresCompanionship)
+            // They must have rolled desire AND be in the explicit "waiting" state.
+            if (!visitorComp.DesiresCompanionship || !visitorComp.IsWaitingForCompanion)
+            {
                 return false;
+            }
 
-            // NEW: Only consider clients who are *actively waiting* at a Companion Spot.
-            // This flag is set by JobDriver_WaitForCompanionDate once the pawn reaches the spot
-            // and starts the actual waiting toil. While they are pathing across the map, this is false.
-            if (!visitorComp.IsWaitingForCompanion && !forced)
-                return false;
-
-            // We still require a Companion Spot to exist and be reasonably close,
-            // as a guard against weird edge cases (destroyed spot, teleports, etc.).
+            // Make sure they are reasonably close to a Companion Spot.
             Building_CompanionSpot spot = CompanionshipUtility.FindNearestCompanionSpot(client);
             if (spot == null)
+            {
                 return false;
+            }
 
-            // Require them to be within 2 tiles (distance^2 <= 4) of the spot.
-            float distSqToSpot = (client.Position - spot.Position).LengthHorizontalSquared;
-            if (distSqToSpot > 4f && !forced)
+            float distanceSquared = (client.Position - spot.Position).LengthHorizontalSquared;
+            if (!forced && distanceSquared > MaxDistanceFromSpotSquared)
+            {
+                // They might have wandered off; don't treat them as an active client anymore.
                 return false;
+            }
 
-            // Companion-side comp: respect daily limits, etc.
+            // Companion progression / daily limit
             CompCompanionship comp = pawn.TryGetComp<CompCompanionship>();
             if (comp == null)
+            {
                 return false;
+            }
 
-            if (!comp.CanStartDateNow(pawn) && !forced)
+            if (!forced && !comp.CanStartDateNow(pawn))
+            {
                 return false;
+            }
 
-            // Need a valid CompanionBed.
+            // Find a suitable companion bed for this pair.
             Building_Bed bed = FindBestCompanionBed(pawn, client);
             if (bed == null)
+            {
                 return false;
+            }
 
-            // Final reservation checks.
-            if (!pawn.CanReserve(client, 1, -1, null, false))
+            if (!pawn.CanReserve(bed, 1, -1, null, forced))
+            {
                 return false;
-
-            if (!pawn.CanReserve(bed, 1, -1, null, false))
-                return false;
+            }
 
             return true;
         }
@@ -124,17 +135,16 @@ namespace Riot.Companionship
         {
             Pawn client = t as Pawn;
             if (client == null)
+            {
                 return null;
-
-            // Double-check that the job is still valid.
-            if (!HasJobOnThing(pawn, client, forced))
-                return null;
+            }
 
             Building_Bed bed = FindBestCompanionBed(pawn, client);
             if (bed == null)
+            {
                 return null;
+            }
 
-            // Main Companion-side date job: targetA = client, targetB = bed.
             Job job = JobMaker.MakeJob(CompanionshipDefOf.DoCompanionDate, client, bed);
             job.locomotionUrgency = LocomotionUrgency.Jog;
             job.ignoreJoyTimeAssignment = true;
@@ -143,57 +153,58 @@ namespace Riot.Companionship
         }
 
         /// <summary>
-        /// Find the best CompanionBed for this date, owned by the player, reachable,
-        /// and either unowned or owned by this Companion.
-        /// Picks the closest valid bed to the worker.
+        /// Finds the best CompanionBed for this companion-client pair.
+        /// Currently: any colonist-owned CompanionBed with a free slot that both can reach,
+        /// preferring the closest to the companion.
         /// </summary>
         private Building_Bed FindBestCompanionBed(Pawn companion, Pawn client)
         {
-            if (companion == null || companion.Map == null)
-                return null;
-
             Map map = companion.Map;
-            Building_Bed bestBed = null;
-            float bestDistSq = float.MaxValue;
-
-            foreach (Building_Bed bed in map.listerBuildings.AllBuildingsColonistOfClass<Building_Bed>())
+            if (map == null)
             {
-                if (bed == null || !bed.Spawned)
-                    continue;
+                return null;
+            }
 
-                // Must be our special CompanionBed.
-                if (bed.def != CompanionshipDefOf.CompanionBed)
-                    continue;
+            IEnumerable<Building_Bed> candidateBeds = map.listerBuildings
+                .AllBuildingsColonistOfClass<Building_Bed>()
+                .Where(b =>
+                    b.def == CompanionshipDefOf.CompanionBed && // must be the special bed
+                    !b.ForPrisoners &&                          // not a prisoner bed
+                    b.Faction == companion.Faction &&           // owned by the colony
+                    HasFreeSlotFor(b, companion) &&             // at least one free spot for companion
+                    companion.CanReach(b, PathEndMode.OnCell, Danger.Unspecified) &&
+                    client.CanReach(b, PathEndMode.OnCell, Danger.Unspecified));
 
-                // Must belong to the player and not be prisoner-only.
-                if (bed.Faction != Faction.OfPlayerSilentFail)
-                    continue;
+            Building_Bed bestBed = null;
+            float bestDist = float.MaxValue;
 
-                if (bed.ForPrisoners)
-                    continue;
-
-                // Ownership rules: unowned or owned by this companion.
-                var owners = bed.OwnersForReading;
-                if (owners != null && owners.Count > 0 && !owners.Contains(companion))
-                    continue;
-
-                // Bed must have a free sleeping slot.
-                if (!bed.AnyUnoccupiedSleepingSlot)
-                    continue;
-
-                // Reachability and reservation checks for the worker.
-                if (!companion.CanReach(bed, PathEndMode.OnCell, Danger.Some))
-                    continue;
-
-                float distSq = (companion.Position - bed.Position).LengthHorizontalSquared;
-                if (distSq < bestDistSq)
+            foreach (Building_Bed bed in candidateBeds)
+            {
+                float dist = (bed.Position - companion.Position).LengthHorizontalSquared;
+                if (dist < bestDist)
                 {
-                    bestDistSq = distSq;
+                    bestDist = dist;
                     bestBed = bed;
                 }
             }
 
             return bestBed;
+        }
+
+        /// <summary>
+        /// True if the bed has an unoccupied sleeping slot.
+        /// For now we ignore ownership and just require a free slot.
+        /// If we later want stricter ownership behavior, we can query CompAssignableToPawn.
+        /// </summary>
+        private bool HasFreeSlotFor(Building_Bed bed, Pawn pawn)
+        {
+            if (bed == null)
+            {
+                return false;
+            }
+
+            // Simple check: fewer occupants than sleeping slots.
+            return bed.CurOccupants.Count() < bed.SleepingSlotsCount;
         }
     }
 }
