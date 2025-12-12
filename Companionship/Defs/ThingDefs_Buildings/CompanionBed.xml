@@ -6,29 +6,33 @@
     <label>companion bed</label>
     <description>A bed reserved for companionship work.</description>
 
-    <!-- Make it behave like a double bed (footprint) -->
+    <!-- 2x2 footprint = double-bed behavior in vanilla -->
     <size>(2,2)</size>
 
-    <!-- Force a consistent look (no stuff/material tinting) -->
-    <stuffCategories Inherit="False" />
-    <costStuffCount>0</costStuffCount>
-
-    <!-- Use a single, consistent texture -->
     <graphicData>
+      <!-- Loads: Textures/Things/Building/Companionship/CompanionBed.png -->
       <texPath>Things/Building/Companionship/CompanionBed</texPath>
+
+      <!-- One texture only -->
       <graphicClass>Graphic_Single</graphicClass>
-      <shaderType>Cutout</shaderType>
+
+      <!-- Draw at full 2x2 size -->
       <drawSize>(2,2)</drawSize>
     </graphicData>
 
-    <!-- Fixed build cost -->
+    <!-- Optional but nice for the build menu icon -->
+    <uiIconPath>Things/Building/Companionship/CompanionBed</uiIconPath>
+
     <costList>
       <WoodLog>40</WoodLog>
     </costList>
 
     <building>
+      <bed_showSleeperBody>false</bed_showSleeperBody>
+      <bed_healPerDay>4</bed_healPerDay>
       <bed_defaultMedical>false</bed_defaultMedical>
     </building>
+
   </ThingDef>
 
 </Defs>

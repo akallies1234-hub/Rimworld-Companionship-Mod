@@ -1,106 +1,96 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 using RimWorld;
 using Verse;
 using Verse.AI;
 
 namespace Companionship
 {
-    /// <summary>
-    /// Scans for visitors currently waiting at the Companion Spot and assigns a date job.
-    /// IMPORTANT: only triggers when the visitor is actually "in the waiting phase"
-    /// (within radius of the companion spot).
-    /// </summary>
     public class WorkGiver_CompanionshipDate : WorkGiver_Scanner
     {
-        private const float ReadyRadius = 7f;
-
         public override PathEndMode PathEndMode => PathEndMode.Touch;
+
+        public override bool ShouldSkip(Pawn pawn, bool forced = false)
+        {
+            if (pawn == null || pawn.Map == null) return true;
+            if (!pawn.IsColonist) return true;
+
+            if (CompanionshipDateUtility.IsOnDateCooldown(pawn)) return true;
+
+            ThingDef bedDef = DefDatabase<ThingDef>.GetNamedSilentFail("Companionship_CompanionBed");
+            if (bedDef == null) return true;
+
+            return pawn.Map.listerThings.ThingsOfDef(bedDef).Count == 0;
+        }
 
         public override IEnumerable<Thing> PotentialWorkThingsGlobal(Pawn pawn)
         {
-            if (pawn?.Map == null) return Enumerable.Empty<Thing>();
+            if (pawn == null || pawn.Map == null) yield break;
 
-            var comp = pawn.Map.GetComponent<MapComponent_Companionship>();
-            if (comp == null) return Enumerable.Empty<Thing>();
+            JobDef waitDef = DefDatabase<JobDef>.GetNamedSilentFail("Companionship_WaitAtSpot");
+            if (waitDef == null) yield break;
 
-            return comp.WaitingVisitors.Cast<Thing>();
+            IReadOnlyList<Pawn> pawns = pawn.Map.mapPawns.AllPawnsSpawned;
+            for (int i = 0; i < pawns.Count; i++)
+            {
+                Pawn p = pawns[i];
+                if (p == null) continue;
+                if (p.Faction == Faction.OfPlayer) continue;
+                if (!p.Spawned) continue;
+                if (p.Dead || p.Downed) continue;
+                if (CompanionshipDateUtility.IsOnDateCooldown(p)) continue;
+
+                if (p.CurJobDef == waitDef)
+                    yield return p;
+            }
         }
 
         public override bool HasJobOnThing(Pawn pawn, Thing t, bool forced = false)
         {
-            if (pawn == null || t == null) return false;
-            if (pawn.Map == null) return false;
-            if (!pawn.RaceProps.Humanlike) return false;
-            if (!pawn.IsColonistPlayerControlled) return false;
+            Pawn guest = t as Pawn;
+            if (guest == null) return false;
 
-            Pawn visitor = t as Pawn;
-            if (visitor == null) return false;
+            if (CompanionshipDateUtility.IsOnDateCooldown(pawn)) return false;
+            if (!CompanionshipDateUtility.IsValidDateGuest(guest)) return false;
 
-            var comp = pawn.Map.GetComponent<MapComponent_Companionship>();
-            if (comp == null || !comp.IsWaiting(visitor)) return false;
+            JobDef waitDef = DefDatabase<JobDef>.GetNamedSilentFail("Companionship_WaitAtSpot");
+            if (waitDef == null) return false;
 
-            if (visitor.Dead || visitor.Downed) return false;
-            if (visitor.HostileTo(Faction.OfPlayer)) return false;
+            // Guest must still be waiting.
+            if (guest.CurJobDef != waitDef) return false;
 
-            // MUST be on the waiting job
-            if (visitor.CurJobDef != CompanionshipDefOf.Companionship_WaitAtCompanionSpot) return false;
+            // Worker must be able to reserve the guest (this prevents multiple colonists racing).
+            if (!pawn.CanReserve(guest, 1, -1, null, forced)) return false;
 
-            // MUST be close enough to the spot (this prevents early triggering while they’re still walking in)
-            if (!comp.TryGetCompanionSpot(out Thing spot)) return false;
-            if (!visitor.Position.InHorDistOf(spot.Position, ReadyRadius)) return false;
-
-            // Optional but recommended: don't trigger while the visitor is still actively pathing
-            if (visitor.pather != null && visitor.pather.Moving) return false;
-
-            if (!pawn.CanReserve(visitor, 1, -1, null, forced)) return false;
-
-            if (!TryFindAvailableCompanionBed(pawn, out Building_Bed bed)) return false;
-            if (!pawn.CanReserve(bed, 1, -1, null, forced)) return false;
+            // Must be able to find an empty bed (do NOT reserve it here; lovin will handle it).
+            Building_Bed bed;
+            if (!CompanionshipDateUtility.TryFindAvailableCompanionBed(pawn, guest, out bed)) return false;
+            if (bed == null) return false;
 
             return true;
         }
 
         public override Job JobOnThing(Pawn pawn, Thing t, bool forced = false)
         {
-            Pawn visitor = t as Pawn;
-            if (visitor == null) return null;
+            Pawn guest = t as Pawn;
+            if (guest == null) return null;
 
-            if (!TryFindAvailableCompanionBed(pawn, out Building_Bed bed)) return null;
+            JobDef dateDef = DefDatabase<JobDef>.GetNamedSilentFail("Companionship_Date");
+            if (dateDef == null) return null;
 
-            // TargetA = visitor, TargetB = bed
-            Job job = JobMaker.MakeJob(CompanionshipDefOf.Companionship_Date, visitor, bed);
+            Building_Bed bed;
+            if (!CompanionshipDateUtility.TryFindAvailableCompanionBed(pawn, guest, out bed)) return null;
+            if (bed == null) return null;
 
-            // Store lovin duration (1–3 hours) in job.count so it persists
-            job.count = Rand.RangeInclusive(2500, 7500);
+            // Set a short cooldown immediately to prevent same-tick thrash if the job fails instantly.
+            // (If it succeeds, the JobDriver will extend cooldown again.)
+            CompanionshipDateUtility.SetDateCooldown(pawn, 600);  // 10 seconds
+            CompanionshipDateUtility.SetDateCooldown(guest, 600); // 10 seconds
 
+            Job job = JobMaker.MakeJob(dateDef, guest, bed);
+
+            // Keep this from going stale instantly; but it shouldn't loop now due to cooldown + simpler reservations.
+            job.expiryInterval = 2000;
             return job;
-        }
-
-
-        private bool TryFindAvailableCompanionBed(Pawn pawn, out Building_Bed bed)
-        {
-            bed = null;
-            if (pawn?.Map == null) return false;
-
-            List<Thing> beds = pawn.Map.listerThings.ThingsOfDef(CompanionshipDefOf.Companionship_CompanionBed);
-            if (beds == null || beds.Count == 0) return false;
-
-            foreach (Thing t in beds)
-            {
-                var b = t as Building_Bed;
-                if (b == null) continue;
-                if (b.Destroyed) continue;
-                if (b.IsForbidden(pawn)) continue;
-
-                if (b.CurOccupants != null && b.CurOccupants.Any()) continue;
-                if (!pawn.CanReach(b, PathEndMode.Touch, Danger.Some)) continue;
-
-                bed = b;
-                return true;
-            }
-
-            return false;
         }
     }
 }

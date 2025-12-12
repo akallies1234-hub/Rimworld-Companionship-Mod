@@ -53,6 +53,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CompanionshipDateUtility.cs" />
     <Compile Include="CompanionshipDefOf.cs" />
     <Compile Include="CompanionshipMod.cs" />
     <Compile Include="GameComponent_Companionship.cs" />
@@ -67,4 +68,8 @@
     <Compile Include="WorkGiver_CompanionshipDate.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>
+    </PostBuildEvent>
+  </PropertyGroup>
 </Project>
