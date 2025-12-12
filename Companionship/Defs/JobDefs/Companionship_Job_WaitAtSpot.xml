@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+
+  <JobDef>
+    <defName>Companionship_WaitAtCompanionSpot</defName>
+    <label>waiting for companionship</label>
+    <driverClass>Companionship.JobDriver_WaitAtCompanionSpot</driverClass>
+    <reportString>waiting for companionship.</reportString>
+    <playerInterruptible>true</playerInterruptible>
+  </JobDef>
+
+</Defs>

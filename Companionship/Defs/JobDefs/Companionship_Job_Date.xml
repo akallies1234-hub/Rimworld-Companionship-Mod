@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+
+  <JobDef>
+    <defName>Companionship_Date</defName>
+    <label>companionship date</label>
+
+    <driverClass>Companionship.JobDriver_CompanionshipDate</driverClass>
+
+    <reportString>having companionship.</reportString>
+
+    <playerInterruptible>true</playerInterruptible>
+  </JobDef>
+
+</Defs>

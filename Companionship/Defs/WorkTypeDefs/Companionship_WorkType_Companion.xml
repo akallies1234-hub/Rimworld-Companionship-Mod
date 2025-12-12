@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+
+  <WorkTypeDef>
+    <defName>Companionship_Companion</defName>
+    <label>companion</label>
+    <labelShort>companion</labelShort>
+    <description>Offer companionship to visitors.</description>
+
+    <!-- Social is the main "theme" skill for this work type -->
+    <relevantSkills>
+      <li>Social</li>
+    </relevantSkills>
+
+    <!-- Priority controls where it tends to sit compared to other work types -->
+    <naturalPriority>60</naturalPriority>
+
+    <!-- No special tags for now -->
+    <workTags>None</workTags>
+  </WorkTypeDef>
+
+</Defs>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+
+  <ThingDef ParentName="BuildingBase">
+    <defName>Companionship_CompanionSpot</defName>
+    <label>companion spot</label>
+    <description>Visitors who want companionship will wait near this spot for a companion colonist.</description>
+
+    <graphicData>
+      <texPath>Things/Building/Companionship/CompanionSpot</texPath>
+      <graphicClass>Graphic_Single</graphicClass>
+      <drawSize>(1,1)</drawSize>
+    </graphicData>
+
+    <designationCategory>Misc</designationCategory>
+
+    <altitudeLayer>BuildingOnTop</altitudeLayer>
+    <passability>Standable</passability>
+    <fillPercent>0</fillPercent>
+    <rotatable>false</rotatable>
+
+    <!-- No materials, basically instant -->
+    <costList />
+    <statBases>
+      <MaxHitPoints>60</MaxHitPoints>
+      <WorkToBuild>0</WorkToBuild>
+      <Flammability>0</Flammability>
+    </statBases>
+
+    <building>
+      <isEdifice>false</isEdifice>
+    </building>
+  </ThingDef>
+
+</Defs>

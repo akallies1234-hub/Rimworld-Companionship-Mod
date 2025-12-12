@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+
+  <WorkGiverDef>
+    <defName>Companionship_WorkGiver_Date</defName>
+    <label>companionship</label>
+
+    <!-- Required by RimWorld for report strings -->
+    <verb>offer companionship</verb>
+    <gerund>offering companionship</gerund>
+
+    <giverClass>Companionship.WorkGiver_CompanionshipDate</giverClass>
+
+    <workType>Companionship_Companion</workType>
+    <priorityInType>100</priorityInType>
+
+    <emergency>false</emergency>
+  </WorkGiverDef>
+
+</Defs>

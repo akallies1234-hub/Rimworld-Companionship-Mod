@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+
+  <JobDef>
+    <defName>Companionship_ChatAtCompanionSpot</defName>
+    <label>chatting</label>
+    <driverClass>Companionship.JobDriver_ChatAtCompanionSpot</driverClass>
+    <reportString>chatting.</reportString>
+    <playerInterruptible>true</playerInterruptible>
+  </JobDef>
+
+</Defs>

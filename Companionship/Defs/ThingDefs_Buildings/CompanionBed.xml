@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+
+  <ThingDef ParentName="Bed">
+    <defName>Companionship_CompanionBed</defName>
+    <label>companion bed</label>
+    <description>A bed reserved for companionship work.</description>
+
+    <!-- Make it behave like a double bed (footprint) -->
+    <size>(2,2)</size>
+
+    <!-- Force a consistent look (no stuff/material tinting) -->
+    <stuffCategories Inherit="False" />
+    <costStuffCount>0</costStuffCount>
+
+    <!-- Use a single, consistent texture -->
+    <graphicData>
+      <texPath>Things/Building/Companionship/CompanionBed</texPath>
+      <graphicClass>Graphic_Single</graphicClass>
+      <shaderType>Cutout</shaderType>
+      <drawSize>(2,2)</drawSize>
+    </graphicData>
+
+    <!-- Fixed build cost -->
+    <costList>
+      <WoodLog>40</WoodLog>
+    </costList>
+
+    <building>
+      <bed_defaultMedical>false</bed_defaultMedical>
+    </building>
+  </ThingDef>
+
+</Defs>
