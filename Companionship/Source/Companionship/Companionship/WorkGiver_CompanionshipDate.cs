@@ -9,58 +9,43 @@ namespace Companionship
     {
         public override PathEndMode PathEndMode => PathEndMode.Touch;
 
+        // CRITICAL: we are scanning pawns (the guests), not buildings.
+        public override ThingRequest PotentialWorkThingRequest => ThingRequest.ForGroup(ThingRequestGroup.Pawn);
+
         public override bool ShouldSkip(Pawn pawn, bool forced = false)
         {
             if (pawn == null || pawn.Map == null) return true;
             if (!pawn.IsColonist) return true;
 
-            MapComponent_Companionship mc = pawn.Map.GetComponent<MapComponent_Companionship>();
-            if (mc == null) return true;
-
-            // WaitingVisitors is IEnumerable<Pawn> in this project.
-            IEnumerable<Pawn> waiting = mc.WaitingVisitors;
-            bool anyWaiting = false;
-            if (waiting != null)
-            {
-                foreach (Pawn p in waiting)
-                {
-                    if (p != null)
-                    {
-                        anyWaiting = true;
-                        break;
-                    }
-                }
-            }
-            if (!anyWaiting) return true;
+            JobDef waitDef = DefDatabase<JobDef>.GetNamedSilentFail("Companionship_WaitAtSpot");
+            JobDef dateDef = DefDatabase<JobDef>.GetNamedSilentFail("Companionship_Date");
+            if (waitDef == null || dateDef == null) return true;
 
             // No beds? no point scanning guests.
             ThingDef bedDef = DefDatabase<ThingDef>.GetNamedSilentFail("Companionship_CompanionBed");
             if (bedDef == null) return true;
 
-            return pawn.Map.listerThings.ThingsOfDef(bedDef).Count == 0;
+            List<Thing> beds = pawn.Map.listerThings.ThingsOfDef(bedDef);
+            return beds == null || beds.Count == 0;
         }
 
         public override IEnumerable<Thing> PotentialWorkThingsGlobal(Pawn pawn)
         {
             if (pawn == null || pawn.Map == null) yield break;
 
-            MapComponent_Companionship mc = pawn.Map.GetComponent<MapComponent_Companionship>();
-            if (mc == null) yield break;
+            JobDef waitDef = DefDatabase<JobDef>.GetNamedSilentFail("Companionship_WaitAtSpot");
+            if (waitDef == null) yield break;
 
-            IEnumerable<Pawn> waiting = mc.WaitingVisitors;
-            if (waiting == null) yield break;
-
-            // IMPORTANT: this must match what the MapComponent assigns.
-            JobDef waitDef = CompanionshipDefOf.Companionship_WaitAtCompanionSpot;
-
-            foreach (Pawn guest in waiting)
+            // In 1.6 this may be IEnumerable<Pawn> (not List / IReadOnlyList). Just foreach it.
+            foreach (Pawn p in pawn.Map.mapPawns.AllPawnsSpawned)
             {
-                if (guest == null) continue;
-                if (!guest.Spawned) continue;
-                if (guest.Dead || guest.Downed) continue;
+                if (p == null) continue;
+                if (p.Faction == Faction.OfPlayer) continue;
+                if (!p.Spawned) continue;
+                if (p.Dead || p.Downed) continue;
 
-                if (guest.CurJobDef == waitDef)
-                    yield return guest;
+                if (p.CurJobDef == waitDef)
+                    yield return p;
             }
         }
 
@@ -69,19 +54,34 @@ namespace Companionship
             Pawn guest = t as Pawn;
             if (guest == null) return false;
 
-            // Must still be waiting at the companion spot.
-            if (guest.CurJobDef != CompanionshipDefOf.Companionship_WaitAtCompanionSpot) return false;
+            JobDef waitDef = DefDatabase<JobDef>.GetNamedSilentFail("Companionship_WaitAtSpot");
+            JobDef dateDef = DefDatabase<JobDef>.GetNamedSilentFail("Companionship_Date");
+            if (waitDef == null || dateDef == null) return false;
+
+            // Guest must still be in the waiting phase
+            if (guest.CurJobDef != waitDef) return false;
             if (!CompanionshipDateUtility.IsValidDateGuest(guest)) return false;
 
-            // Worker must be able to reserve the guest.
+            // Optional: prevent repeated rapid attempts if something is failing
+            if (CompanionshipDateUtility.IsOnDateCooldown(pawn)) return false;
+
+            // Worker must be able to reserve the guest
             if (!pawn.CanReserve(guest, 1, -1, null, forced)) return false;
 
-            // Must be able to find and reserve a bed.
-            Building_Bed bed;
-            if (!CompanionshipDateUtility.TryFindAvailableCompanionBed(pawn, guest, out bed)) return false;
+            // We need the companion spot the guest is waiting at (TargetIndex.A of their wait job)
+            if (guest.CurJob == null) return false;
+            Thing spotThing = guest.CurJob.GetTarget(TargetIndex.A).Thing;
+            if (spotThing == null) return false;
+
+            // Must be able to find and reserve a bed (2+ slots, empty, reachable, reservable)
+            if (!CompanionshipDateUtility.TryFindAvailableCompanionBed(pawn, guest, out Building_Bed bed)) return false;
             if (bed == null) return false;
 
-            if (!pawn.CanReserve(bed, 1, -1, null, forced)) return false;
+            // Reserve ALL sleeping slots so nobody else jumps in
+            int slots = bed.SleepingSlotsCount;
+            if (slots < 2) return false;
+
+            if (!pawn.CanReserve(bed, slots, -1, null, forced)) return false;
 
             return true;
         }
@@ -92,17 +92,27 @@ namespace Companionship
             if (guest == null) return null;
 
             JobDef dateDef = DefDatabase<JobDef>.GetNamedSilentFail("Companionship_Date");
-            if (dateDef == null) return null;
+            JobDef waitDef = DefDatabase<JobDef>.GetNamedSilentFail("Companionship_WaitAtSpot");
+            if (dateDef == null || waitDef == null) return null;
 
-            Building_Bed bed;
-            if (!CompanionshipDateUtility.TryFindAvailableCompanionBed(pawn, guest, out bed)) return null;
+            if (guest.CurJobDef != waitDef) return null;
+            if (guest.CurJob == null) return null;
+
+            Thing spotThing = guest.CurJob.GetTarget(TargetIndex.A).Thing;
+            if (spotThing == null) return null;
+
+            if (!CompanionshipDateUtility.TryFindAvailableCompanionBed(pawn, guest, out Building_Bed bed)) return null;
             if (bed == null) return null;
 
-            // A = guest, B = bed
-            Job job = JobMaker.MakeJob(dateDef, guest, bed);
+            // IMPORTANT: set targets to match JobDriver_CompanionshipDate expectations:
+            // A = guest, B = companion spot, C = bed
+            Job job = JobMaker.MakeJob(dateDef);
+            job.SetTarget(TargetIndex.A, guest);
+            job.SetTarget(TargetIndex.B, spotThing);
+            job.SetTarget(TargetIndex.C, bed);
 
-            // Short expiry prevents stale jobs from looping if conditions change quickly.
-            job.expiryInterval = 300; // ~5 seconds
+            // Short expiry prevents stale looping if conditions change fast
+            job.expiryInterval = 600; // ~10 seconds
             return job;
         }
     }

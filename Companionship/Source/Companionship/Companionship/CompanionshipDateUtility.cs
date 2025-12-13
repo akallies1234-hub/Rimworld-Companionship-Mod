@@ -14,34 +14,25 @@ namespace Companionship
         public static bool IsOnDateCooldown(Pawn p)
         {
             if (p == null) return false;
-            if (Find.TickManager == null) return false;
 
-            int until;
-            if (_dateCooldownUntilTick.TryGetValue(p.thingIDNumber, out until))
+            int id = p.thingIDNumber;
+            if (!_dateCooldownUntilTick.TryGetValue(id, out int until)) return false;
+
+            int now = Find.TickManager.TicksGame;
+            if (now >= until)
             {
-                return Find.TickManager.TicksGame < until;
+                _dateCooldownUntilTick.Remove(id);
+                return false;
             }
-            return false;
+
+            return true;
         }
 
         public static void SetDateCooldown(Pawn p, int ticksFromNow)
         {
             if (p == null) return;
-            if (Find.TickManager == null) return;
-
             int now = Find.TickManager.TicksGame;
-            int until = now + ticksFromNow;
-
-            int existing;
-            if (_dateCooldownUntilTick.TryGetValue(p.thingIDNumber, out existing))
-            {
-                if (until > existing)
-                    _dateCooldownUntilTick[p.thingIDNumber] = until;
-            }
-            else
-            {
-                _dateCooldownUntilTick[p.thingIDNumber] = until;
-            }
+            _dateCooldownUntilTick[p.thingIDNumber] = now + ticksFromNow;
         }
 
         public static bool IsValidDateGuest(Pawn guest)
@@ -55,13 +46,13 @@ namespace Companionship
             if (!guest.RaceProps.Humanlike) return false;
             if (guest.jobs == null) return false;
             if (IsOnDateCooldown(guest)) return false;
+
             return true;
         }
 
         public static bool TryFindAvailableCompanionBed(Pawn worker, Pawn guest, out Building_Bed bed)
         {
             bed = null;
-
             if (worker == null || worker.Map == null) return false;
             if (IsOnDateCooldown(worker)) return false;
 
@@ -78,17 +69,20 @@ namespace Companionship
             {
                 Building_Bed b = beds[i] as Building_Bed;
                 if (b == null) continue;
-                if (b.DestroyedOrNull()) continue;
+                if (b.Destroyed) continue;
                 if (!b.Spawned) continue;
 
-                // Need at least 2 slots for lovin.
+                // Must be a 2+ slot bed for two pawns
                 if (b.SleepingSlotsCount < 2) continue;
 
-                // Must be empty.
+                // Must be empty
                 if (b.AnyOccupants) continue;
 
-                // Reachable by the WORKER.
+                // Reachable + reservable by the worker
                 if (!worker.CanReach(b, PathEndMode.Touch, Danger.Some)) continue;
+
+                int slots = b.SleepingSlotsCount;
+                if (!worker.CanReserve(b, slots, -1, null, false)) continue;
 
                 float d = worker.Position.DistanceToSquared(b.Position);
                 if (d < bestDist)
