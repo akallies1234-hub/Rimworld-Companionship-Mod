@@ -6,18 +6,20 @@ namespace Companionship
     [DefOf]
     public static class CompanionshipDefOf
     {
-        // Jobs
-        public static JobDef Companionship_Date;
-        public static JobDef Companionship_WaitAtCompanionSpot;
-        public static JobDef Companionship_JoinDate;
-        public static JobDef Companionship_ChatAtCompanionSpot;
-
-        // Things
         public static ThingDef Companionship_CompanionSpot;
         public static ThingDef Companionship_CompanionBed;
 
-        // Thoughts
-        public static ThoughtDef Companionship_CompanionDate;
+        // Visitor-side jobs
+        public static JobDef Companionship_VisitorLoiterAtCompanionSpot;
+        public static JobDef Companionship_VisitorParticipateGreeting;
+        public static JobDef Companionship_VisitorFollowCompanionToBed;
+
+        // Colonist companion job (work type)
+        public static JobDef Companionship_CompanionGreetAndEscortToBed;
+
+        // Custom lovin (initiator + partner)
+        public static JobDef Companionship_CustomLovin;
+        public static JobDef Companionship_CustomLovinPartner;
 
         static CompanionshipDefOf()
         {

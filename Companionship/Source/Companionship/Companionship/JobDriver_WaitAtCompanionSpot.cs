@@ -5,84 +5,28 @@ using Verse.AI;
 
 namespace Companionship
 {
-    /// <summary>
-    /// Visitor job: go to the Companion Spot, then casually wander within a radius while waiting.
-    /// Also ends itself automatically once the MapComponent clears the waiting state.
-    /// </summary>
     public class JobDriver_WaitAtCompanionSpot : JobDriver
     {
-        private const TargetIndex SpotInd = TargetIndex.A;
-
-        private const int WanderRadius = 7;
-        private const int MinMoveIntervalTicks = 120;  // ~2 seconds
-        private const int MaxMoveIntervalTicks = 300;  // ~5 seconds
-
-        private Thing SpotThing
-        {
-            get { return job.GetTarget(SpotInd).Thing; }
-        }
+        private Thing Spot => job.targetA.Thing;
 
         public override bool TryMakePreToilReservations(bool errorOnFailed)
         {
-            return true;
+            return pawn.Reserve(Spot, job, 1, -1, null, errorOnFailed);
         }
 
         protected override IEnumerable<Toil> MakeNewToils()
         {
-            this.FailOnDespawnedOrNull(SpotInd);
+            this.FailOnDespawnedNullOrForbidden(TargetIndex.A);
 
-            yield return Toils_Goto.GotoThing(SpotInd, PathEndMode.Touch);
+            // Go to the spot (Touch = adjacent, since the spot occupies its cell).
+            yield return Toils_Goto.GotoThing(TargetIndex.A, PathEndMode.Touch);
 
-            Toil wander = new Toil();
-            wander.defaultCompleteMode = ToilCompleteMode.Never;
+            // Wait 1 in-game hour.
+            Toil wait = Toils_General.Wait(GenDate.TicksPerHour, TargetIndex.A);
+            wait.handlingFacing = true;
+            wait.socialMode = RandomSocialMode.Off;
 
-            int nextMoveTick = 0;
-
-            wander.initAction = () =>
-            {
-                nextMoveTick = Find.TickManager.TicksGame + Rand.RangeInclusive(MinMoveIntervalTicks, MaxMoveIntervalTicks);
-            };
-
-            wander.tickAction = () =>
-            {
-                var comp = pawn.Map != null ? pawn.Map.GetComponent<MapComponent_Companionship>() : null;
-                if (comp == null || !comp.IsWaiting(pawn))
-                {
-                    EndJobWith(JobCondition.Succeeded);
-                    return;
-                }
-
-                Thing spot = SpotThing;
-                if (spot == null || spot.Destroyed || !spot.Spawned)
-                {
-                    EndJobWith(JobCondition.Incompletable);
-                    return;
-                }
-
-                if (!pawn.Position.InHorDistOf(spot.Position, WanderRadius))
-                {
-                    IntVec3 returnCell = CellFinder.RandomClosewalkCellNear(spot.Position, pawn.Map, WanderRadius);
-                    pawn.pather.StartPath(returnCell, PathEndMode.OnCell);
-                    nextMoveTick = Find.TickManager.TicksGame + Rand.RangeInclusive(MinMoveIntervalTicks, MaxMoveIntervalTicks);
-                    return;
-                }
-
-                if (pawn.pather != null && pawn.pather.Moving)
-                    return;
-
-                int now = Find.TickManager.TicksGame;
-                if (now >= nextMoveTick)
-                {
-                    IntVec3 dest = CellFinder.RandomClosewalkCellNear(spot.Position, pawn.Map, WanderRadius);
-                    if (dest.IsValid)
-                    {
-                        pawn.pather.StartPath(dest, PathEndMode.OnCell);
-                    }
-                    nextMoveTick = now + Rand.RangeInclusive(MinMoveIntervalTicks, MaxMoveIntervalTicks);
-                }
-            };
-
-            yield return wander;
+            yield return wait;
         }
     }
 }

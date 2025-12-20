@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Defs>
+
+  <!-- Visitor: loiter near spot (wander within 7 tiles) -->
+  <JobDef>
+    <defName>Companionship_VisitorLoiterAtCompanionSpot</defName>
+    <driverClass>Companionship.JobDriver_VisitorLoiterAtCompanionSpot</driverClass>
+    <reportString>waiting for a companion.</reportString>
+    <playerInterruptible>false</playerInterruptible>
+    <casualInterruptible>true</casualInterruptible>
+  </JobDef>
+
+  <!-- Visitor: participate in greeting (stand still + face companion) -->
+  <JobDef>
+    <defName>Companionship_VisitorParticipateGreeting</defName>
+    <driverClass>Companionship.JobDriver_VisitorParticipateGreeting</driverClass>
+    <reportString>talking with a companion.</reportString>
+    <playerInterruptible>false</playerInterruptible>
+    <casualInterruptible>false</casualInterruptible>
+  </JobDef>
+
+  <!-- Visitor: go to bed and wait -->
+  <JobDef>
+    <defName>Companionship_VisitorFollowCompanionToBed</defName>
+    <driverClass>Companionship.JobDriver_VisitorFollowCompanionToBed</driverClass>
+    <reportString>heading to a companion bed.</reportString>
+    <playerInterruptible>false</playerInterruptible>
+    <casualInterruptible>false</casualInterruptible>
+  </JobDef>
+
+  <!-- Colonist companion: greet + escort (work type job) -->
+  <JobDef>
+    <defName>Companionship_CompanionGreetAndEscortToBed</defName>
+    <driverClass>Companionship.JobDriver_CompanionGreetAndEscortToBed</driverClass>
+    <reportString>hosting a date.</reportString>
+    <playerInterruptible>true</playerInterruptible>
+    <casualInterruptible>true</casualInterruptible>
+  </JobDef>
+
+  <!-- Custom lovin (initiator) -->
+  <JobDef>
+    <defName>Companionship_CustomLovin</defName>
+    <driverClass>Companionship.JobDriver_CustomLovin</driverClass>
+    <reportString>spending intimate time together.</reportString>
+    <playerInterruptible>true</playerInterruptible>
+    <casualInterruptible>false</casualInterruptible>
+  </JobDef>
+
+  <!-- Custom lovin (partner) -->
+  <JobDef>
+    <defName>Companionship_CustomLovinPartner</defName>
+    <driverClass>Companionship.JobDriver_CustomLovinPartner</driverClass>
+    <reportString>spending intimate time together.</reportString>
+    <playerInterruptible>false</playerInterruptible>
+    <casualInterruptible>false</casualInterruptible>
+  </JobDef>
+
+</Defs>

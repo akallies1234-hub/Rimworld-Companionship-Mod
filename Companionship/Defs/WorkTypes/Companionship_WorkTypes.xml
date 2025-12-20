@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Defs>
+
+  <WorkTypeDef>
+    <defName>Companionship_Companion</defName>
+
+    <labelShort>Companion</labelShort>
+    <label>companion</label>
+    <pawnLabel>Companion</pawnLabel>
+    <gerundLabel>providing companionship</gerundLabel>
+    <description>Work related to providing companionship services.</description>
+
+    <naturalPriority>1075</naturalPriority>
+    <workTags>Social</workTags>
+
+    <relevantSkills>
+      <li>Social</li>
+    </relevantSkills>
+
+    <alwaysStartActive>false</alwaysStartActive>
+
+    <workGiversByPriority>
+      <li>Companionship_WorkGiver_CompanionWait</li>
+    </workGiversByPriority>
+  </WorkTypeDef>
+
+</Defs>

@@ -36,6 +36,7 @@
     </Reference>
     <Reference Include="Assembly-CSharp">
       <HintPath>..\..\..\..\..\RimWorldWin64_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -47,25 +48,39 @@
     <Reference Include="System.Xml" />
     <Reference Include="UnityEngine">
       <HintPath>..\..\..\..\..\RimWorldWin64_Data\Managed\UnityEngine.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
       <HintPath>..\..\..\..\..\RimWorldWin64_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\..\RimWorldWin64_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\..\RimWorldWin64_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>False</Private>
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CompanionshipDateUtility.cs" />
+    <Compile Include="CompanionshipBootstrap.cs" />
     <Compile Include="CompanionshipDefOf.cs" />
-    <Compile Include="CompanionshipMod.cs" />
-    <Compile Include="GameComponent_Companionship.cs" />
-    <Compile Include="HarmonyInit.cs" />
-    <Compile Include="HarmonyPatches_LovinContext.cs" />
-    <Compile Include="JobDriver_ChatAtCompanionSpot.cs" />
-    <Compile Include="JobDriver_CompanionshipDate.cs" />
-    <Compile Include="JobDriver_JoinCompanionshipDate.cs" />
+    <Compile Include="CompanionshipVisitorTracker.cs" />
+    <Compile Include="DesignatorBuild_InstantBuild.cs" />
+    <Compile Include="InstantBuildExtension.cs" />
+    <Compile Include="JobDriver_CompanionGreetAndEscortToBed.cs" />
+    <Compile Include="JobDriver_CustomLovin.cs" />
+    <Compile Include="JobDriver_CustomLovinPartner.cs" />
+    <Compile Include="JobDriver_VisitorFollowCompanionToBed.cs" />
+    <Compile Include="JobDriver_VisitorLoiterAtCompanionSpot.cs" />
+    <Compile Include="JobDriver_VisitorParticipateGreeting.cs" />
     <Compile Include="JobDriver_WaitAtCompanionSpot.cs" />
-    <Compile Include="MapComponent_Companionship.cs" />
+    <Compile Include="Placeworker_SingleCompanionSpot.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="WorkGiver_CompanionshipDate.cs" />
+    <Compile Include="WorkGiver_CompanionWait.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

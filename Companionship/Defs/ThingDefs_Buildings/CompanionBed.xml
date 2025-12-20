@@ -1,38 +1,30 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8" ?>
 <Defs>
 
-  <ThingDef ParentName="Bed">
+  <!-- Companion Bed (2 slots via DoubleBed parent, fixed look, not stuff-based) -->
+  <ThingDef ParentName="DoubleBed">
     <defName>Companionship_CompanionBed</defName>
     <label>companion bed</label>
-    <description>A bed reserved for companionship work.</description>
+    <description>A dedicated bed used for companion services.</description>
 
-    <!-- 2x2 footprint = double-bed behavior in vanilla -->
+    <!-- 2x2 footprint -->
     <size>(2,2)</size>
 
+    <!-- Custom texture -->
     <graphicData>
-      <!-- Loads: Textures/Things/Building/Companionship/CompanionBed.png -->
-      <texPath>Things/Building/Companionship/CompanionBed</texPath>
-
-      <!-- One texture only -->
+      <texPath>CompanionBed</texPath>
       <graphicClass>Graphic_Single</graphicClass>
-
-      <!-- Draw at full 2x2 size -->
       <drawSize>(2,2)</drawSize>
     </graphicData>
 
-    <!-- Optional but nice for the build menu icon -->
-    <uiIconPath>Things/Building/Companionship/CompanionBed</uiIconPath>
+    <!-- IMPORTANT: make it NOT stuff-based (prevents material selector and fixes the error) -->
+    <costStuffCount>0</costStuffCount>
+    <stuffCategories Inherit="False" />
 
-    <costList>
-      <WoodLog>40</WoodLog>
+    <!-- Fixed build cost (no material selection) -->
+    <costList Inherit="False">
+      <Steel>40</Steel>
     </costList>
-
-    <building>
-      <bed_showSleeperBody>false</bed_showSleeperBody>
-      <bed_healPerDay>4</bed_healPerDay>
-      <bed_defaultMedical>false</bed_defaultMedical>
-    </building>
-
   </ThingDef>
 
 </Defs>

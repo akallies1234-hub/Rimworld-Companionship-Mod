@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Defs>
+
+  <WorkGiverDef>
+    <defName>Companionship_WorkGiver_CompanionWait</defName>
+    <label>host date</label>
+
+    <workType>Companionship_Companion</workType>
+    <giverClass>Companionship.WorkGiver_CompanionWait</giverClass>
+
+    <priorityInType>50</priorityInType>
+    <scanThings>true</scanThings>
+
+    <verb>date</verb>
+    <gerund>dating</gerund>
+  </WorkGiverDef>
+
+</Defs>

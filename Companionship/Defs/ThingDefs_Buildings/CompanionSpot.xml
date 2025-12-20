@@ -1,35 +1,52 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8" ?>
 <Defs>
 
+  <!-- Companion Spot (free, instant build, one per map) -->
   <ThingDef ParentName="BuildingBase">
     <defName>Companionship_CompanionSpot</defName>
     <label>companion spot</label>
-    <description>Visitors who want companionship will wait near this spot for a companion colonist.</description>
+    <description>Visitors who want companion services will wait here.</description>
 
+    <thingClass>Building</thingClass>
+    <category>Building</category>
+
+    <size>(1,1)</size>
+
+    <!-- Texture path is relative to /Textures and WITHOUT extension -->
     <graphicData>
-      <texPath>Things/Building/Companionship/CompanionSpot</texPath>
+      <texPath>CompanionSpot</texPath>
       <graphicClass>Graphic_Single</graphicClass>
       <drawSize>(1,1)</drawSize>
     </graphicData>
 
-    <designationCategory>Misc</designationCategory>
+    <!-- Ensure it is NOT stuff-based -->
+    <costStuffCount>0</costStuffCount>
+    <stuffCategories />
 
-    <altitudeLayer>BuildingOnTop</altitudeLayer>
-    <passability>Standable</passability>
-    <fillPercent>0</fillPercent>
-    <rotatable>false</rotatable>
-
-    <!-- No materials, basically instant -->
+    <!-- Free / instant -->
     <costList />
     <statBases>
-      <MaxHitPoints>60</MaxHitPoints>
       <WorkToBuild>0</WorkToBuild>
-      <Flammability>0</Flammability>
     </statBases>
 
-    <building>
-      <isEdifice>false</isEdifice>
-    </building>
+    <designationCategory>Misc</designationCategory>
+    <uiOrder>3151</uiOrder>
+
+    <passability>Standable</passability>
+    <fillPercent>0</fillPercent>
+    <useHitPoints>false</useHitPoints>
+
+    <!-- One spot max -->
+    <placeWorkers>
+      <li>Companionship.PlaceWorker_SingleCompanionSpot</li>
+    </placeWorkers>
+
+    <!-- Your Harmony “instant build” hook -->
+    <modExtensions>
+      <li Class="Companionship.InstantBuildExtension">
+        <instantBuild>true</instantBuild>
+      </li>
+    </modExtensions>
   </ThingDef>
 
 </Defs>
