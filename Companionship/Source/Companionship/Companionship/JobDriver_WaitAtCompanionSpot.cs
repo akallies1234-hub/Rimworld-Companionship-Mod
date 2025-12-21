@@ -21,8 +21,8 @@ namespace Companionship
             // Go to the spot (Touch = adjacent, since the spot occupies its cell).
             yield return Toils_Goto.GotoThing(TargetIndex.A, PathEndMode.Touch);
 
-            // Wait 1 in-game hour.
-            Toil wait = Toils_General.Wait(GenDate.TicksPerHour, TargetIndex.A);
+            // Wait (tuned)
+            Toil wait = Toils_General.Wait(CompanionshipTuning.CompanionIdleAtSpotDurationTicks, TargetIndex.A);
             wait.handlingFacing = true;
             wait.socialMode = RandomSocialMode.Off;
 

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+
+  <ThoughtDef>
+    <defName>Companionship_DateTerrible</defName>
+    <label>terrible date</label>
+    <description>The date was a complete disaster. Hard to shake that feeling.</description>
+    <thoughtClass>Thought_Memory</thoughtClass>
+    <durationDays>2</durationDays>
+    <stackLimit>1</stackLimit>
+    <stages>
+      <li>
+        <label>terrible date</label>
+        <description>The date was a complete disaster. Hard to shake that feeling.</description>
+        <baseMoodEffect>-3</baseMoodEffect>
+      </li>
+    </stages>
+  </ThoughtDef>
+
+  <ThoughtDef>
+    <defName>Companionship_DateBad</defName>
+    <label>bad date</label>
+    <description>The date went poorly. Awkward moments linger.</description>
+    <thoughtClass>Thought_Memory</thoughtClass>
+    <durationDays>2</durationDays>
+    <stackLimit>1</stackLimit>
+    <stages>
+      <li>
+        <label>bad date</label>
+        <description>The date went poorly. Awkward moments linger.</description>
+        <baseMoodEffect>-1</baseMoodEffect>
+      </li>
+    </stages>
+  </ThoughtDef>
+
+  <!-- Kept for compatibility / saves, but Neutral dates no longer apply any moodlet in code. -->
+  <ThoughtDef>
+    <defName>Companionship_DateNeutral</defName>
+    <label>uneventful date</label>
+    <description>The date was fine. Not amazing, not terrible.</description>
+    <thoughtClass>Thought_Memory</thoughtClass>
+    <durationDays>2</durationDays>
+    <stackLimit>1</stackLimit>
+    <stages>
+      <li>
+        <label>uneventful date</label>
+        <description>The date was fine. Not amazing, not terrible.</description>
+        <baseMoodEffect>0</baseMoodEffect>
+      </li>
+    </stages>
+  </ThoughtDef>
+
+  <ThoughtDef>
+    <defName>Companionship_DateGood</defName>
+    <label>good date</label>
+    <description>The date went well. A nice boost to the mood.</description>
+    <thoughtClass>Thought_Memory</thoughtClass>
+    <durationDays>2</durationDays>
+    <stackLimit>1</stackLimit>
+    <stages>
+      <li>
+        <label>good date</label>
+        <description>The date went well. A nice boost to the mood.</description>
+        <baseMoodEffect>1</baseMoodEffect>
+      </li>
+    </stages>
+  </ThoughtDef>
+
+  <ThoughtDef>
+    <defName>Companionship_DateExcellent</defName>
+    <label>excellent date</label>
+    <description>The date was a real hit. Confidence and warmth linger afterward.</description>
+    <thoughtClass>Thought_Memory</thoughtClass>
+    <durationDays>2</durationDays>
+    <stackLimit>1</stackLimit>
+    <stages>
+      <li>
+        <label>excellent date</label>
+        <description>The date was a real hit. Confidence and warmth linger afterward.</description>
+        <baseMoodEffect>3</baseMoodEffect>
+      </li>
+    </stages>
+  </ThoughtDef>
+
+  <ThoughtDef>
+    <defName>Companionship_DateExceptional</defName>
+    <label>exceptional date</label>
+    <description>The date was unforgettable. It leaves a lasting glow.</description>
+    <thoughtClass>Thought_Memory</thoughtClass>
+    <durationDays>2</durationDays>
+    <stackLimit>1</stackLimit>
+    <stages>
+      <li>
+        <label>exceptional date</label>
+        <description>The date was unforgettable. It leaves a lasting glow.</description>
+        <baseMoodEffect>5</baseMoodEffect>
+      </li>
+    </stages>
+  </ThoughtDef>
+
+</Defs>

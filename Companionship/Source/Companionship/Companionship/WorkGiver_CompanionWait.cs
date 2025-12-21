@@ -5,119 +5,146 @@ using Verse.AI;
 
 namespace Companionship
 {
-    /// <summary>
-    /// Companion work triggers only when a visitor is actually waiting near the Companion Spot.
-    /// It assigns a job to greet a specific visitor and escort them to a Companion Bed.
-    /// </summary>
     public class WorkGiver_CompanionWait : WorkGiver_Scanner
     {
-        public override ThingRequest PotentialWorkThingRequest =>
-            ThingRequest.ForDef(CompanionshipDefOf.Companionship_CompanionSpot);
+        public override PathEndMode PathEndMode => PathEndMode.Touch;
 
         public override IEnumerable<Thing> PotentialWorkThingsGlobal(Pawn pawn)
         {
-            if (pawn == null || pawn.Map == null) yield break;
+            Map map = pawn?.Map;
+            if (map == null) yield break;
 
-            List<Thing> list = pawn.Map.listerThings.ThingsOfDef(CompanionshipDefOf.Companionship_CompanionSpot);
-            for (int i = 0; i < list.Count; i++)
-                yield return list[i];
+            List<Thing> spots = map.listerThings.ThingsOfDef(CompanionshipDefOf.Companionship_CompanionSpot);
+            if (spots == null) yield break;
+
+            for (int i = 0; i < spots.Count; i++)
+                yield return spots[i];
         }
 
         public override bool ShouldSkip(Pawn pawn, bool forced = false)
         {
             if (pawn == null || pawn.Map == null) return true;
 
-            Thing spot = GetSpot(pawn.Map);
-            if (spot == null) return true;
+            if (!CompanionshipPawnUtility.IsEligibleCompanionWorker(pawn))
+                return true;
 
-            var tracker = pawn.Map.GetComponent<CompanionshipVisitorTracker>();
+            CompanionshipVisitorTracker tracker = pawn.Map.GetComponent<CompanionshipVisitorTracker>();
             if (tracker == null) return true;
 
-            // Skip if no eligible visitor is currently waiting near spot.
-            return tracker.FindEligibleWaitingVisitorNearSpot(spot, pawn) == null;
-        }
+            IReadOnlyList<CompanionshipVisitorTracker.VisitorRecord> records = tracker.Records;
+            if (records == null || records.Count == 0) return true;
 
-        public override bool HasJobOnThing(Pawn pawn, Thing t, bool forced = false)
-        {
-            if (pawn == null || pawn.Map == null) return false;
-            if (t == null || t.def != CompanionshipDefOf.Companionship_CompanionSpot) return false;
+            for (int i = 0; i < records.Count; i++)
+            {
+                var r = records[i];
+                if (r == null) continue;
 
-            if (pawn.Faction != Faction.OfPlayer) return false;
-            if (t.IsForbidden(pawn)) return false;
-
-            var tracker = pawn.Map.GetComponent<CompanionshipVisitorTracker>();
-            if (tracker == null) return false;
-
-            Pawn visitor = tracker.FindEligibleWaitingVisitorNearSpot(t, pawn);
-            if (visitor == null) return false;
-
-            Building_Bed bed = FindAvailableCompanionBed(pawn, visitor);
-            if (bed == null) return false;
-
-            // Soft pre-check
-            if (!pawn.CanReserve(visitor, 1, -1, null, forced)) return false;
-            if (!pawn.CanReserve(bed, 1, -1, null, forced)) return false;
+                if (r.wantsDate && r.state == CompanionshipVisitorTracker.DateState.WaitingNearSpot && r.claimedBy == null)
+                    return false;
+            }
 
             return true;
         }
 
+        public override bool HasJobOnThing(Pawn pawn, Thing t, bool forced = false)
+        {
+            return TryFindAssignment(pawn, t, out _, out _, out _);
+        }
+
         public override Job JobOnThing(Pawn pawn, Thing t, bool forced = false)
         {
-            var tracker = pawn.Map.GetComponent<CompanionshipVisitorTracker>();
-            if (tracker == null) return null;
-
-            Pawn visitor = tracker.FindEligibleWaitingVisitorNearSpot(t, pawn);
-            if (visitor == null) return null;
-
-            Building_Bed bed = FindAvailableCompanionBed(pawn, visitor);
-            if (bed == null) return null;
-
-            // Claim at assignment time (NOT in HasJobOnThing).
-            if (!tracker.TryClaimVisitorForDate(visitor, pawn))
+            if (!TryFindAssignment(pawn, t, out Building spot, out Pawn visitor, out Building_Bed bed))
                 return null;
 
+            // IMPORTANT:
+            // JobDriver_CompanionGreetAndEscortToBed expects:
+            //   TargetIndex.A = visitor
+            //   TargetIndex.B = bed
+            // Spot is optional; we store it in C for convenience/future use.
             Job job = JobMaker.MakeJob(CompanionshipDefOf.Companionship_CompanionGreetAndEscortToBed, visitor, bed);
-            job.ignoreForbidden = true;
+            job.targetC = spot;
+            job.count = 1;
+
+            int expiry = CompanionshipTuning.CompanionGreetAndEscortJobExpiryTicks;
+            if (expiry > 0) job.expiryInterval = expiry;
+
+            job.checkOverrideOnExpire = true;
             return job;
         }
 
-        private static Thing GetSpot(Map map)
+        private bool TryFindAssignment(Pawn companion, Thing t, out Building spot, out Pawn visitor, out Building_Bed bed)
         {
-            List<Thing> list = map.listerThings.ThingsOfDef(CompanionshipDefOf.Companionship_CompanionSpot);
-            return (list != null && list.Count > 0) ? list[0] : null;
-        }
+            spot = null;
+            visitor = null;
+            bed = null;
 
-        private static Building_Bed FindAvailableCompanionBed(Pawn companion, Pawn visitor)
-        {
-            Map map = companion.Map;
-            if (map == null) return null;
+            if (companion == null || companion.Map == null) return false;
 
-            List<Thing> beds = map.listerThings.ThingsOfDef(CompanionshipDefOf.Companionship_CompanionBed);
-            if (beds == null || beds.Count == 0) return null;
+            spot = t as Building;
+            if (spot == null || spot.Destroyed) return false;
+            if (spot.def != CompanionshipDefOf.Companionship_CompanionSpot) return false;
 
-            Building_Bed best = null;
-            int bestDist = int.MaxValue;
+            if (!CompanionshipPawnUtility.IsEligibleCompanionWorker(companion)) return false;
 
-            for (int i = 0; i < beds.Count; i++)
+            CompanionshipVisitorTracker tracker = companion.Map.GetComponent<CompanionshipVisitorTracker>();
+            if (tracker == null) return false;
+
+            IReadOnlyList<CompanionshipVisitorTracker.VisitorRecord> records = tracker.Records;
+            if (records == null || records.Count == 0) return false;
+
+            float bestScore = float.MinValue;
+            Pawn bestVisitor = null;
+            Building_Bed bestBed = null;
+
+            for (int i = 0; i < records.Count; i++)
             {
-                Building_Bed bed = beds[i] as Building_Bed;
-                if (bed == null || !bed.Spawned) continue;
+                CompanionshipVisitorTracker.VisitorRecord r = records[i];
+                if (r == null) continue;
 
-                // For this early step, just require "unoccupied"
-                if (bed.AnyOccupants) continue;
+                if (!r.wantsDate) continue;
+                if (r.state != CompanionshipVisitorTracker.DateState.WaitingNearSpot) continue;
+                if (r.claimedBy != null) continue;
 
-                if (bed.IsForbidden(companion)) continue;
-                if (!companion.CanReserve(bed)) continue;
+                Pawn v = r.pawn;
+                if (v == null) continue;
+                if (v.DestroyedOrNull() || v.Dead) continue;
+                if (!v.Spawned) continue;
+                if (v.Map != companion.Map) continue;
 
-                int d = visitor != null ? bed.Position.DistanceToSquared(visitor.Position) : bed.Position.DistanceToSquared(companion.Position);
-                if (d < bestDist)
+                if (!v.RaceProps.Humanlike) continue;
+                if (v.Downed || v.InMentalState) continue;
+                if (v.HostileTo(Faction.OfPlayer)) continue;
+
+                // Don’t pick someone already in a session (belt + suspenders).
+                if (tracker.HasActiveSession(v)) continue;
+
+                // Must be romance-compatible per our existing utility logic.
+                if (!CompanionshipPawnUtility.IsRomancePreferenceCompatible(companion, v))
+                    continue;
+
+                // Must have a bed that works for BOTH.
+                Building_Bed candidateBed = CompanionshipBedUtility.FindAvailableCompanionBed(companion.Map, companion, v);
+                if (candidateBed == null) continue;
+
+                // Light pre-checks so we don't spam jobs that fail reservations instantly.
+                if (!companion.CanReserve(v)) continue;
+                if (!companion.CanReserve(candidateBed)) continue;
+
+                // Prefer closer visitors; slight bias toward being near the spot.
+                float score = -companion.Position.DistanceToSquared(v.Position);
+                score += -0.10f * v.Position.DistanceToSquared(spot.Position);
+
+                if (score > bestScore)
                 {
-                    bestDist = d;
-                    best = bed;
+                    bestScore = score;
+                    bestVisitor = v;
+                    bestBed = candidateBed;
                 }
             }
 
-            return best;
+            visitor = bestVisitor;
+            bed = bestBed;
+            return visitor != null && bed != null;
         }
     }
 }

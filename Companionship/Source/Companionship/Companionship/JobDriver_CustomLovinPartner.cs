@@ -5,91 +5,133 @@ using Verse.AI;
 
 namespace Companionship
 {
+    /// <summary>
+    /// Visitor-side "partner" job during custom lovin.
+    /// Purpose: keep the visitor at the bed slot while the companion runs the initiator job.
+    /// The visitor does NOT gain Social XP here (only companions should).
+    /// </summary>
     public class JobDriver_CustomLovinPartner : JobDriver
     {
-        private Pawn Initiator => job.targetA.Pawn;
-        private Building_Bed Bed => job.targetB.Thing as Building_Bed;
+        private Pawn Initiator => job?.targetA.Pawn;
+        private Building_Bed Bed => job?.targetB.Thing as Building_Bed;
 
-        private const int LovinDuration = 2 * GenDate.TicksPerHour;
-
-        // Weapon holstering
+        // Weapon holstering (visitor safety/immersion; mirrors initiator logic but is independent)
         private ThingWithComps holsteredPrimary;
         private bool didHolster;
+        private bool endHandled;
 
         public override void ExposeData()
         {
             base.ExposeData();
             Scribe_References.Look(ref holsteredPrimary, "holsteredPrimary");
             Scribe_Values.Look(ref didHolster, "didHolster");
+            Scribe_Values.Look(ref endHandled, "endHandled");
         }
 
-        public override bool TryMakePreToilReservations(bool errorOnFailed) => true;
+        public override bool TryMakePreToilReservations(bool errorOnFailed)
+        {
+            // Companion reserves bed + visitor; visitor doesn't reserve anything to avoid reservation deadlocks.
+            return true;
+        }
 
         protected override IEnumerable<Toil> MakeNewToils()
         {
-            this.FailOn(() => Initiator == null || !Initiator.Spawned);
-            this.FailOnDespawnedNullOrForbidden(TargetIndex.B);
+            this.FailOn(() => pawn == null || pawn.Map == null);
+            this.FailOn(() => Initiator == null || Initiator.DestroyedOrNull());
+            this.FailOnDestroyedOrNull(TargetIndex.B);
 
+            AddFinishAction(HandleJobEnd);
+
+            // Go to bed slot 1 (visitor side)
             yield return Toils_Goto.GotoCell(GetSlotCellSafe(Bed, 1), PathEndMode.OnCell);
 
-            Toil lovin = ToilMaker.MakeToil("Companionship_CustomLovinPartner");
-            lovin.defaultCompleteMode = ToilCompleteMode.Delay;
-            lovin.defaultDuration = LovinDuration;
-
-            lovin.initAction = () =>
+            // Wait for the lovin duration.
+            Toil wait = ToilMaker.MakeToil();
+            wait.initAction = () =>
             {
                 TryHolsterPrimary(pawn);
 
+                // Present as "in bed" for rendering.
                 pawn.pather?.StopDead();
                 pawn.jobs.posture = PawnPosture.LayingInBed;
             };
 
-            lovin.tickAction = () =>
+            wait.defaultCompleteMode = ToilCompleteMode.Delay;
+            wait.defaultDuration = CompanionshipTuning.LovinDurationTicks;
+
+            // If the initiator stops doing the initiator job, stop waiting (avoid hanging).
+            wait.tickAction = () =>
             {
+                // Keep them visually in bed.
                 pawn.pather?.StopDead();
                 pawn.jobs.posture = PawnPosture.LayingInBed;
 
-                if (Initiator != null && Initiator.Spawned)
-                    pawn.rotationTracker.FaceTarget(Initiator);
+                if (Initiator == null || Initiator.DestroyedOrNull())
+                {
+                    EndJobWith(JobCondition.Incompletable);
+                    return;
+                }
+
+                if (Initiator.CurJobDef != CompanionshipDefOf.Companionship_CustomLovin)
+                {
+                    EndJobWith(JobCondition.InterruptForced);
+                }
             };
 
-            lovin.AddFinishAction(() =>
-            {
-                TryReequipPrimary(pawn);
-            });
+            yield return wait;
+        }
 
-            yield return lovin;
+        private void HandleJobEnd(JobCondition condition)
+        {
+            if (endHandled) return;
+            endHandled = true;
+
+            TryReequipPrimary(pawn);
         }
 
         private void TryHolsterPrimary(Pawn p)
         {
             if (didHolster) return;
             if (p?.equipment == null) return;
+            if (p.inventory?.innerContainer == null) return;
 
             ThingWithComps primary = p.equipment.Primary;
             if (primary == null) return;
 
-            if (p.inventory?.innerContainer != null)
+            bool moved = p.equipment.TryTransferEquipmentToContainer(primary, p.inventory.innerContainer);
+            if (moved)
             {
-                bool moved = p.equipment.TryTransferEquipmentToContainer(primary, p.inventory.innerContainer);
-                if (moved)
-                {
-                    holsteredPrimary = primary;
-                    didHolster = true;
-                }
+                holsteredPrimary = primary;
+                didHolster = true;
             }
         }
 
         private void TryReequipPrimary(Pawn p)
         {
             if (!didHolster) return;
-            if (holsteredPrimary == null) return;
-            if (p == null || p.Destroyed || !p.Spawned) return;
-            if (p.equipment == null) return;
-
-            if (p.inventory?.innerContainer != null && p.inventory.innerContainer.Contains(holsteredPrimary))
+            if (holsteredPrimary == null)
             {
-                p.inventory.innerContainer.Remove(holsteredPrimary);
+                didHolster = false;
+                return;
+            }
+
+            if (p?.equipment == null || p.inventory?.innerContainer == null)
+                return;
+
+            if (p.inventory.innerContainer.Contains(holsteredPrimary))
+            {
+                int movedCount = p.inventory.innerContainer.TryTransferToContainer(
+                    holsteredPrimary,
+                    p.equipment.GetDirectlyHeldThings(),
+                    1);
+
+                if (movedCount <= 0)
+                {
+                    p.equipment.AddEquipment(holsteredPrimary);
+                }
+            }
+            else
+            {
                 p.equipment.AddEquipment(holsteredPrimary);
             }
 
@@ -101,19 +143,13 @@ namespace Companionship
         {
             if (bed == null) return IntVec3.Invalid;
 
-            try
-            {
-                int slots = bed.SleepingSlotsCount;
-                if (slots <= 0) return bed.Position;
-                if (slotIndex < 0) slotIndex = 0;
-                if (slotIndex >= slots) slotIndex = slots - 1;
+            int slots = bed.SleepingSlotsCount;
+            if (slots <= 0) return bed.Position;
 
-                return bed.GetSleepingSlotPos(slotIndex);
-            }
-            catch
-            {
-                return bed.Position;
-            }
+            if (slotIndex < 0) slotIndex = 0;
+            if (slotIndex >= slots) slotIndex = slots - 1;
+
+            return bed.GetSleepingSlotPos(slotIndex);
         }
     }
 }

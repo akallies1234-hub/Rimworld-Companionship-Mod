@@ -1,5 +1,5 @@
-﻿using RimWorld;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using RimWorld;
 using Verse;
 using Verse.AI;
 
@@ -17,7 +17,7 @@ namespace Companionship
 
             Toil wait = ToilMaker.MakeToil("Companionship_VisitorGreetingStandStill");
             wait.defaultCompleteMode = ToilCompleteMode.Delay;
-            wait.defaultDuration = GenDate.TicksPerHour;
+            wait.defaultDuration = CompanionshipTuning.GreetingDurationTicks;
 
             wait.initAction = () =>
             {

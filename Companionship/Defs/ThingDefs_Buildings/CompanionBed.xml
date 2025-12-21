@@ -4,6 +4,9 @@
   <!-- Companion Bed (2 slots via DoubleBed parent, fixed look, not stuff-based) -->
   <ThingDef ParentName="DoubleBed">
     <defName>Companionship_CompanionBed</defName>
+
+    <thingClass>Companionship.Building_CompanionBed</thingClass>
+
     <label>companion bed</label>
     <description>A dedicated bed used for companion services.</description>
 

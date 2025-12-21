@@ -32,7 +32,7 @@
   <JobDef>
     <defName>Companionship_CompanionGreetAndEscortToBed</defName>
     <driverClass>Companionship.JobDriver_CompanionGreetAndEscortToBed</driverClass>
-    <reportString>hosting a date.</reportString>
+    <reportString>providing companionship.</reportString>
     <playerInterruptible>true</playerInterruptible>
     <casualInterruptible>true</casualInterruptible>
   </JobDef>
